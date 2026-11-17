@@ -261,18 +261,36 @@ def download_audio_and_cover(video_id, out_prefix):
     audio_path = f"{out_prefix}.mp3"
     thumb_template = f"{out_prefix}.%(ext)s"
 
-    base_cmd = get_ytdlp_base_cmd(for_search=False)
-    cmd = [
-        *base_cmd,
-        '--extract-audio',
-        '--audio-format', 'mp3',
-        '--audio-quality', '0',
-        '--write-thumbnail',
-        '--convert-thumbnails', 'jpg',
-        '-o', f"{out_prefix}.%(ext)s",
-        url
-    ]
-    subprocess.run(cmd, check=True)
+    strategies = []
+    if os.path.exists('cookies.txt'):
+        strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--remote-components', 'ejs:github'])
+        strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=web,mweb'])
+    strategies.append(['yt-dlp', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data'])
+    strategies.append(['yt-dlp', '--extractor-args', 'youtube:player_client=mweb,android'])
+
+    download_success = False
+    last_err = None
+    for base in strategies:
+        cmd = [
+            *base,
+            '--extract-audio',
+            '--audio-format', 'mp3',
+            '--audio-quality', '0',
+            '--write-thumbnail',
+            '--convert-thumbnails', 'jpg',
+            '-o', f"{out_prefix}.%(ext)s",
+            url
+        ]
+        try:
+            subprocess.run(cmd, check=True)
+            download_success = True
+            break
+        except subprocess.CalledProcessError as e:
+            last_err = e
+            print(f"Strategy failed ({base[1:3] if len(base)>2 else base}), trying fallback...")
+
+    if not download_success:
+        raise last_err or Exception("All download strategies failed.")
 
     # Find downloaded thumbnail
     thumb_candidates = glob.glob(f"{out_prefix}*.jpg") + glob.glob(f"{out_prefix}*.webp") + glob.glob(f"{out_prefix}*.png")
@@ -611,23 +629,36 @@ def main():
     print(f"   AUTOPILOT BOT: PROCESSING {max_count} LO-FI VIDEO(S) TO YOUTUBE")
     print("=======================================================")
 
-    songs = search_trending_songs(max_count=max_count)
-    if not songs:
-        print("No new songs found. All trending songs already processed!")
+    # Fetch a wider candidate pool so if any single song has streaming restrictions, we immediately fallback to the next!
+    pool_size = max(max_count * 4, 8)
+    candidates = search_trending_songs(max_count=pool_size)
+    if not candidates:
+        print("No new candidate songs found.")
         return
 
     history = load_history()
-    for s in songs:
+    uploaded_count = 0
+
+    for s in candidates:
+        if uploaded_count >= max_count:
+            break
         try:
             res = process_one_song(s)
             history.append(res)
             save_history(history)
-            print("Waiting 15 seconds before next video...")
-            time.sleep(15)
+            uploaded_count += 1
+            if uploaded_count < max_count:
+                print("Waiting 15 seconds before next video...")
+                time.sleep(15)
         except Exception as e:
-            print(f"Error processing song {s}: {e}")
+            print(f"\n[WARNING] Could not process {s.get('title')}: {e}")
+            print("--> Moving immediately to next candidate song in queue...\n")
+            continue
 
-    print("\nALL 4 VIDEOS PROCESSED & UPLOADED SUCCESSFULLY!")
+    if uploaded_count > 0:
+        print(f"\nSUCCESS: {uploaded_count} LO-FI VIDEO(S) PROCESSED & UPLOADED!")
+    else:
+        print("\nFailed to upload videos in this run.")
 
 if __name__ == '__main__':
     main()
