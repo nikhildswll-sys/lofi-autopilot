@@ -124,12 +124,15 @@ def search_trending_songs(max_count=4):
 
             q = q_list[current_q_idx]
             cat_indices[c_idx] += 1
-            cookie_args = ['--cookies', 'cookies.txt'] if os.path.exists('cookies.txt') else []
+            if os.path.exists('cookies.txt'):
+                cookie_and_extractor_args = ['--cookies', 'cookies.txt']
+            else:
+                cookie_and_extractor_args = ['--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs']
+
             if q.startswith('http'):
                 cmd = [
                     'yt-dlp',
-                    *cookie_args,
-                    '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs',
+                    *cookie_and_extractor_args,
                     '--flat-playlist',
                     '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
                     '--playlist-end', '15',
@@ -138,8 +141,7 @@ def search_trending_songs(max_count=4):
             else:
                 cmd = [
                     'yt-dlp',
-                    *cookie_args,
-                    '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs',
+                    *cookie_and_extractor_args,
                     '--flat-playlist',
                     '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
                     f'ytsearch12:{q}'
@@ -230,11 +232,14 @@ def download_audio_and_cover(video_id, out_prefix):
     audio_path = f"{out_prefix}.mp3"
     thumb_template = f"{out_prefix}.%(ext)s"
 
-    cookie_args = ['--cookies', 'cookies.txt'] if os.path.exists('cookies.txt') else []
+    if os.path.exists('cookies.txt'):
+        cookie_and_extractor_args = ['--cookies', 'cookies.txt']
+    else:
+        cookie_and_extractor_args = ['--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data']
+
     cmd = [
         'yt-dlp',
-        *cookie_args,
-        '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data',
+        *cookie_and_extractor_args,
         '--extract-audio',
         '--audio-format', 'mp3',
         '--audio-quality', '0',
