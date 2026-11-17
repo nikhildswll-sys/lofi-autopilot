@@ -23,6 +23,11 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: Set up Deno (YouTube Signature JS Runtime)
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
       - name: Install System Dependencies (FFmpeg & Rubberband)
         run: |
           sudo apt-get update
