@@ -55,6 +55,14 @@ def get_font(size, bold=True):
             return ImageFont.truetype(p, size)
     return ImageFont.load_default()
 
+def get_ytdlp_base_cmd(for_search=False):
+    import shutil
+    if os.path.exists('cookies.txt') and shutil.which('deno'):
+        return ['yt-dlp', '--cookies', 'cookies.txt', '--remote-components', 'ejs:github']
+    else:
+        arg = 'youtube:player_client=android;player_skip=webpage,configs' if for_search else 'youtube:player_client=android;player_skip=webpage,configs,initial_data'
+        return ['yt-dlp', '--extractor-args', arg]
+
 def search_trending_songs(max_count=4):
     history = load_history()
     done_ids = set(item.get('id') for item in history if isinstance(item, dict))
@@ -94,6 +102,23 @@ def search_trending_songs(max_count=4):
                 'mohit chauhan hit songs official video',
                 'arijit singh hit songs official video'
             ]
+        },
+        {
+            'name': 'Iconic Bangers & Nostalgia (Famous Party & Cult Hits)',
+            'queries': [
+                'daddy mummy video song bhaag johnny',
+                'subah hone na de official video desi boyz',
+                'proper patola official video diljit dosanjh',
+                'baby doll official video ragini mms 2',
+                'high heels te nachche official video',
+                'angreji beat official video honey singh gippy',
+                'kala chashma official video baar baar dekho',
+                'illegal weapon official video jasmine sandlas garry',
+                'balam thanedar official video dinesh goliya',
+                '52 gaj ka daman official video renuka panwar',
+                'hookah bar official video khiladi 786',
+                'chinta ta ta chita chita official video rowdy rathore'
+            ]
         }
     ]
 
@@ -124,15 +149,10 @@ def search_trending_songs(max_count=4):
 
             q = q_list[current_q_idx]
             cat_indices[c_idx] += 1
-            if os.path.exists('cookies.txt'):
-                cookie_and_extractor_args = ['--cookies', 'cookies.txt', '--remote-components', 'ejs:github']
-            else:
-                cookie_and_extractor_args = ['--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs']
-
+            base_cmd = get_ytdlp_base_cmd(for_search=True)
             if q.startswith('http'):
                 cmd = [
-                    'yt-dlp',
-                    *cookie_and_extractor_args,
+                    *base_cmd,
                     '--flat-playlist',
                     '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
                     '--playlist-end', '15',
@@ -140,8 +160,7 @@ def search_trending_songs(max_count=4):
                 ]
             else:
                 cmd = [
-                    'yt-dlp',
-                    *cookie_and_extractor_args,
+                    *base_cmd,
                     '--flat-playlist',
                     '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
                     f'ytsearch12:{q}'
@@ -213,33 +232,38 @@ def clean_song_info(raw_title, uploader):
         candidate_title = part0
 
     # 3. Clean out stray junk words
-    candidate_title = re.sub(r'\b(Official|Music|Full|Lyrical|Lyric|Audio|Video|Song)\b', '', candidate_title, flags=re.IGNORECASE).strip()
+    candidate_title = re.sub(r'\b(Official|Music|Full|Lyrical|Lyric|Audio|Video|Song|HD)\b', '', candidate_title, flags=re.IGNORECASE).strip()
     candidate_title = re.sub(r'^[\s\-_|:,]+|[\s\-_|:,]+$', '', candidate_title).strip()
 
     title = candidate_title or "Hit Track"
-    artist = uploader.replace(' - Topic', '').replace('VEVO', '').strip()
+    clean_uploader = uploader.replace(' - Topic', '').replace('VEVO', '').strip()
 
-    if ' | ' in raw_title:
-        parts = [p.strip() for p in raw_title.split(' | ') if p.strip()]
-        if len(parts) >= 2 and len(parts[1]) < 45:
-            artist = parts[1]
+    # Collect all credited artists, cast, composers from raw title
+    parts = [p.strip() for p in raw_title.split(' | ') if p.strip()]
+    credited_names = []
+    for p in parts[1:]:
+        p_clean = re.sub(r'\b(Full|Video|Song|Audio|Official|HD|Movie)\b', '', p, flags=re.IGNORECASE).strip()
+        if p_clean and len(p_clean) < 40 and p_clean.lower() not in clean_uploader.lower():
+            credited_names.append(p_clean)
+
+    if credited_names:
+        artist_display = ", ".join(credited_names[:3])
+        all_credits = ", ".join(credited_names)
+    else:
+        artist_display = clean_uploader or "Artist"
+        all_credits = clean_uploader or "Original Creators"
 
     title = re.sub(r'[\(\[\{\)\]\}]', '', title).strip()
-    return title or "Hit Track", artist or "Artist"
+    return title or "Hit Track", artist_display, all_credits, clean_uploader
 
 def download_audio_and_cover(video_id, out_prefix):
     url = f"https://www.youtube.com/watch?v={video_id}"
     audio_path = f"{out_prefix}.mp3"
     thumb_template = f"{out_prefix}.%(ext)s"
 
-    if os.path.exists('cookies.txt'):
-        cookie_and_extractor_args = ['--cookies', 'cookies.txt', '--remote-components', 'ejs:github']
-    else:
-        cookie_and_extractor_args = ['--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data']
-
+    base_cmd = get_ytdlp_base_cmd(for_search=False)
     cmd = [
-        'yt-dlp',
-        *cookie_and_extractor_args,
+        *base_cmd,
         '--extract-audio',
         '--audio-format', 'mp3',
         '--audio-quality', '0',
@@ -471,11 +495,12 @@ def process_one_song(song_item):
     raw_title = song_item['title']
     uploader = song_item.get('uploader', '')
 
-    title, artist = clean_song_info(raw_title, uploader)
+    title, artist, all_credits, label = clean_song_info(raw_title, uploader)
     prefix = os.path.join(WORK_DIR, f"song_{vid_id}")
 
     print(f"\n=======================================================")
     print(f"PROCESSING: {title} - {artist}")
+    print(f"Credits: {all_credits} | Label: {label}")
     print(f"=======================================================")
 
     # 1. Download
@@ -501,23 +526,30 @@ def process_one_song(song_item):
 Put on your headphones, close your eyes, and feel the late-night nostalgia. 🌙🖤
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📌 TRACK DETAILS:
-Song: {title}
-Original Artist: {artist}
-Edit & Sound Design: @{CHANNEL_NAME}
-Visuals: 16:9 1080p White Minimalist Luxury Studio
+📌 TRACK & ALL CREATIVE CREDITS:
+🎵 Track Name: {title}
+🎤 Artist(s) / Vocalists / Cast: {all_credits}
+🏢 Original Music Label & Rights: {label}
+🔗 Original Source Video: https://www.youtube.com/watch?v={vid_id}
+
+🎧 Slowed + Reverb Audio Remaster: @{CHANNEL_NAME}
+🎼 Sound Pitch & Tuning: 432Hz Healing Frequency (Taped Harmonic Resample)
+🎛️ Audio DSP: 85Hz Deep Warm Bass Boost (+3.5dB), Vocal Presence EQ (+2.5dB at 2.8kHz), Dual Echo Cathedral Reverb
+🎨 Visual Aesthetic: 16:9 1080p Clean Minimalist White Card Studio Edit
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🤍 SUPPORT THE CHANNEL:
-If you loved the vibe, please Drop a Like 👍, Comment your favorite line, and Subscribe to @{CHANNEL_NAME} for daily aesthetic slowed + reverb edits!
+🤍 ARTIST & CREATOR RESPECT DISCLAIMER:
+All musical compositions, vocal recordings, lyrics, and master audio rights belong entirely to the original artists, lyricists, composers, producers, and their respective music label ({label}).
+This video is a transformative fan tribute and artistic slowed + reverb audio rework created for personal enjoyment, aesthetic relaxation, and mood under the Fair Use doctrine (Section 107 of the US Copyright Act 1976).
+If any copyright holder, music label, or artist would like this edit removed or credits updated, please reach out to us directly and we will take immediate action respectfully.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ COPYRIGHT DISCLAIMER:
-Under Section 107 of the Copyright Act 1976, allowance is made for "fair use". All rights belong to respective owners and music labels. No copyright infringement intended.
+🤍 SUPPORT THE VIBE:
+If you loved the sound, please Drop a Like 👍, Comment your favorite lyric, and Subscribe to @{CHANNEL_NAME} for daily aesthetic slowed + reverb drops!
 
-#SlowedAndReverb #LofiVibes #{title.replace(' ', '')} #{artist.replace(' ', '')} #{CHANNEL_NAME} #NightDrive #432Hz
+#SlowedAndReverb #LofiVibes #{title.replace(' ', '')} #{CHANNEL_NAME} #NightDrive #432Hz #IndianLofi #PartyHits
 """
-    yt_tags = [title, artist, 'slowed and reverb', 'slowed reverb', 'lofi', CHANNEL_NAME, 'aesthetic audio', 'indian lofi', '432hz']
+    yt_tags = [title, artist, 'slowed and reverb', 'slowed reverb', 'lofi', CHANNEL_NAME, 'aesthetic audio', 'indian lofi', '432hz', label]
 
     # 6. Upload
     uploaded_id = upload_to_youtube(video_path, thumb_path, yt_title, yt_desc, yt_tags)
@@ -540,12 +572,40 @@ Under Section 107 of the Copyright Act 1976, allowance is made for "fair use". A
 def main():
     import sys
     max_count = 4
+    target_vid = None
+
     for i, arg in enumerate(sys.argv):
         if arg == '--count' and i + 1 < len(sys.argv):
             try:
                 max_count = int(sys.argv[i + 1])
             except ValueError:
                 pass
+        elif arg == '--video_id' and i + 1 < len(sys.argv):
+            target_vid = sys.argv[i + 1].strip()
+
+    if target_vid:
+        print("=======================================================")
+        print(f"   AUTOPILOT BOT: PROCESSING SPECIFIED VIDEO {target_vid}")
+        print("=======================================================")
+        # Fetch title and uploader via yt-dlp
+        base_cmd = get_ytdlp_base_cmd(for_search=True)
+        check_cmd = [*base_cmd, '--skip-download', '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s', f"https://www.youtube.com/watch?v={target_vid}"]
+        res = subprocess.run(check_cmd, capture_output=True, text=True, check=True)
+        line = res.stdout.strip().split('\n')[0]
+        parts = line.split('|||')
+        song_item = {
+            'id': parts[0],
+            'title': parts[1],
+            'uploader': parts[2] if len(parts) > 2 else 'Official',
+            'duration': float(parts[3]) if len(parts) > 3 and parts[3].replace('.','',1).isdigit() else 200.0,
+            'category': 'Requested Special'
+        }
+        history = load_history()
+        res_item = process_one_song(song_item)
+        history.append(res_item)
+        save_history(history)
+        print("\nSPECIFIED VIDEO PROCESSED & UPLOADED SUCCESSFULLY!")
+        return
 
     print("=======================================================")
     print(f"   AUTOPILOT BOT: PROCESSING {max_count} LO-FI VIDEO(S) TO YOUTUBE")
