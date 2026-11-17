@@ -57,11 +57,12 @@ def get_font(size, bold=True):
 
 def get_ytdlp_base_cmd(for_search=False):
     import shutil
-    if os.path.exists('cookies.txt') and shutil.which('deno'):
-        return ['yt-dlp', '--cookies', 'cookies.txt', '--remote-components', 'ejs:github']
-    else:
-        arg = 'youtube:player_client=android;player_skip=webpage,configs' if for_search else 'youtube:player_client=android;player_skip=webpage,configs,initial_data'
-        return ['yt-dlp', '--extractor-args', arg]
+    base = ['yt-dlp']
+    if shutil.which('deno'):
+        base.extend(['--remote-components', 'ejs:github'])
+    arg = 'youtube:player_client=android;player_skip=webpage,configs' if for_search else 'youtube:player_client=android;player_skip=webpage,configs,initial_data'
+    base.extend(['--extractor-args', arg])
+    return base
 
 def search_trending_songs(max_count=4):
     history = load_history()
@@ -291,12 +292,15 @@ def download_audio_and_cover(video_id, out_prefix):
     audio_path = f"{out_prefix}.mp3"
     thumb_template = f"{out_prefix}.%(ext)s"
 
-    strategies = []
+    strategies = [
+        ['yt-dlp', '--remote-components', 'ejs:github'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=tv,ios'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=mweb,android']
+    ]
     if os.path.exists('cookies.txt'):
         strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--remote-components', 'ejs:github'])
         strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=web,mweb'])
-    strategies.append(['yt-dlp', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data'])
-    strategies.append(['yt-dlp', '--extractor-args', 'youtube:player_client=mweb,android'])
 
     download_success = False
     last_err = None
@@ -329,25 +333,28 @@ def download_audio_and_cover(video_id, out_prefix):
 
 def apply_slowed_reverb(input_audio, output_audio):
     """
-    Crystal-Clear Aesthetic Slowed + Reverb DSP:
-    - Natural tape speed & pitch drop (asetrate ~0.865x)
-    - 432Hz micro-retuning (*0.996)
-    - Vocal Presence Boost (+2.5dB at 2800Hz) so voice cuts through loud & crisp!
-    - Warm Sub-Bass boost (+3.5dB at 85Hz) for deep lo-fi punch
-    - Smooth high-shelf (-1.5dB at 9500Hz) preventing harshness without muffling
-    - Lush cathedral reverb with stereo delay (aecho 60ms & 120ms)
-    - Volume boost (+25%) with studio limiter (-0.5dB) for loud, crystal-clear playback
+    Advanced 5-Layer Anti-Content ID Shield + Crystal-Clear Slowed & Reverb DSP:
+    1. Independent pitch & speed decoupling (asetrate speed drop + librubberband microtonal detune)
+    2. Haas Stereo Phase Offset (14ms channel delay: wide 8D in headphones, mono comb-filtering on YouTube scanner)
+    3. Analog Tape Wow & Flutter (subtle 2.8Hz pitch wobble preventing static FFT peak alignment)
+    4. Pink noise vintage tape/vinyl floor (-34dB bandpassed acoustic mask)
+    5. Warm 85Hz Sub-bass boost + 2600Hz vocal presence + lush dual echo + studio limiter
     """
     speed = round(random.uniform(0.855, 0.875), 4)
-    print(f"Applying Crystal-Clear Slowed+Reverb DSP (Speed: {speed}x, Vocal Boost +2.5dB, 432Hz)...")
+    print(f"Applying Anti-Claim Slowed+Reverb DSP (Speed: {speed}x, Haas 8D, Rubberband Detune, Tape Drift, 432Hz)...")
 
     filter_complex = (
         f"[0:a]asetrate=44100*{speed}*0.996,aresample=44100,"
-        f"equalizer=f=85:width_type=o:width=1.8:g=3.5,"
-        f"equalizer=f=2800:width_type=o:width=1.5:g=2.5,"
+        f"rubberband=pitch=0.96,"
+        f"vibrato=f=2.8:d=0.2,"
+        f"adelay=0|14,"
+        f"equalizer=f=85:width_type=o:width=1.5:g=3.5,"
+        f"equalizer=f=2600:width_type=o:width=1.5:g=2.0,"
         f"equalizer=f=9500:width_type=o:width=2.0:g=-1.5,"
-        f"aecho=0.8:0.85:60:0.25,aecho=0.8:0.75:120:0.18,"
-        f"volume=1.25,alimiter=limit=-0.5dB:level=disabled[a]"
+        f"aecho=0.8:0.85:55:0.22,aecho=0.8:0.75:110:0.16,"
+        f"volume=1.2,alimiter=limit=-0.5dB,aformat=channel_layouts=stereo[main];"
+        f"anoisesrc=d=600:c=pink:r=44100,aformat=channel_layouts=stereo,lowpass=f=3500,highpass=f=500,volume=0.012[noise];"
+        f"[main][noise]amix=inputs=2:duration=first:dropout_transition=2,aformat=channel_layouts=stereo[a]"
     )
 
     cmd = [
