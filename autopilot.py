@@ -716,17 +716,17 @@ def main():
     print(f"   AUTOPILOT BOT: PROCESSING {max_count} LO-FI VIDEO(S) TO YOUTUBE")
     print("=======================================================")
 
-    # Cadence guard for hourly cron: ensure at least 3 hours between uploads
+    # Cadence guard for hourly cron: ensure at least ~1h 45m between uploads (strictly every 2 hours)
     force_run = '--force' in sys.argv
     if not force_run and not target_vid:
         history = load_history()
         if history:
             last_upload = history[-1]
             elapsed = time.time() - last_upload.get('timestamp', 0)
-            min_gap = 3 * 3600 # 3 hours
+            min_gap = int(1.75 * 3600) # ~1h 45m (strictly 1 upload every 2 hours via hourly cron)
             if elapsed < min_gap:
                 mins_left = int((min_gap - elapsed) / 60)
-                print(f"Cadence Check: Last video was uploaded {int(elapsed/60)}m ago. Minimum gap is 3h ({mins_left}m remaining). Skipping to avoid spam.")
+                print(f"Cadence Check: Last video was uploaded {int(elapsed/60)}m ago. Next 2-hour slot in {mins_left}m. Skipping.")
                 return
 
     # Fetch a wider candidate pool so if any single song has streaming restrictions, we immediately fallback to the next!

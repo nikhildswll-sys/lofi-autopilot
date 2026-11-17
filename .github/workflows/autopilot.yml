@@ -2,7 +2,7 @@ name: YouTube Lo-Fi Autopilot
 
 on:
   schedule:
-    # Hourly sentinel: triggers every hour, auto-uploads every 3 hours reliably without missed slots
+    # Hourly sentinel: triggers every hour, auto-uploads every 2 hours reliably (12 videos/day)
     - cron: '15 * * * *'
   workflow_dispatch: # Allows manual 1-click trigger anytime from GitHub Actions tab
     inputs:
