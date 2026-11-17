@@ -124,9 +124,11 @@ def search_trending_songs(max_count=4):
 
             q = q_list[current_q_idx]
             cat_indices[c_idx] += 1
+            cookie_args = ['--cookies', 'cookies.txt'] if os.path.exists('cookies.txt') else []
             if q.startswith('http'):
                 cmd = [
                     'yt-dlp',
+                    *cookie_args,
                     '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs',
                     '--flat-playlist',
                     '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
@@ -136,6 +138,7 @@ def search_trending_songs(max_count=4):
             else:
                 cmd = [
                     'yt-dlp',
+                    *cookie_args,
                     '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs',
                     '--flat-playlist',
                     '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
@@ -227,8 +230,10 @@ def download_audio_and_cover(video_id, out_prefix):
     audio_path = f"{out_prefix}.mp3"
     thumb_template = f"{out_prefix}.%(ext)s"
 
+    cookie_args = ['--cookies', 'cookies.txt'] if os.path.exists('cookies.txt') else []
     cmd = [
         'yt-dlp',
+        *cookie_args,
         '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data',
         '--extract-audio',
         '--audio-format', 'mp3',

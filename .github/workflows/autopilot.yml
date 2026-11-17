@@ -38,10 +38,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt --upgrade yt-dlp
 
-      - name: Restore YouTube OAuth Credentials from Secrets
+      - name: Restore YouTube OAuth Credentials & Cookies from Secrets
         env:
           CLIENT_SECRETS_JSON: ${{ secrets.CLIENT_SECRETS_JSON }}
           TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
         run: |
           if [ -z "$CLIENT_SECRETS_JSON" ] || [ -z "$TOKEN_JSON" ]; then
             echo "ERROR: GitHub Secrets CLIENT_SECRETS_JSON or TOKEN_JSON is missing!"
@@ -50,6 +51,10 @@ jobs:
           fi
           echo "$CLIENT_SECRETS_JSON" > client_secrets.json
           echo "$TOKEN_JSON" > token.json
+          if [ -n "$YOUTUBE_COOKIES" ]; then
+            echo "$YOUTUBE_COOKIES" > cookies.txt
+            echo "YouTube cookies loaded successfully."
+          fi
           echo "Credentials restored successfully without exposing secrets in logs."
 
       - name: Run Autopilot Bot (Fresh Release Radar)
@@ -59,7 +64,7 @@ jobs:
       - name: Clean sensitive credentials before finish
         if: always()
         run: |
-          rm -f client_secrets.json token.json
+          rm -f client_secrets.json token.json cookies.txt
 
       - name: Commit & Push Updated History
         run: |
