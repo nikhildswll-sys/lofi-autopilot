@@ -178,33 +178,35 @@ def search_trending_songs(max_count=4):
 
 def clean_song_info(raw_title, uploader):
     import re
-    clean = re.sub(r'\((Official|Music|Full|Lyric|Lyrical|Audio).*?\)', '', raw_title, flags=re.IGNORECASE)
-    clean = re.sub(r'\[(Official|Music|Full|Lyric|Lyrical|Audio).*?\]', '', clean, flags=re.IGNORECASE)
-    clean = re.sub(r'\(From\s+.*?\)', '', clean, flags=re.IGNORECASE)
-    clean = re.sub(r'\[From\s+.*?\]', '', clean, flags=re.IGNORECASE)
-    clean = clean.replace('Official Music Video', '').replace('Official Video', '').replace('Music Video', '').replace('Full Video', '').strip()
+    # 1. Take everything before the first '(' or '['
+    part0 = raw_title.split('(')[0].split('[')[0].strip()
 
-    title = clean
+    # 2. Split on common separators if in part0
+    if ' | ' in part0:
+        candidate_title = part0.split(' | ')[0].strip()
+    elif ' - ' in part0:
+        candidate_title = part0.split(' - ')[0].strip()
+    elif ' : ' in part0:
+        candidate_title = part0.split(' : ')[0].strip()
+    elif ':' in part0:
+        candidate_title = part0.split(':')[0].strip()
+    else:
+        candidate_title = part0
+
+    # 3. Clean out stray junk words
+    candidate_title = re.sub(r'\b(Official|Music|Full|Lyrical|Lyric|Audio|Video|Song)\b', '', candidate_title, flags=re.IGNORECASE).strip()
+    candidate_title = re.sub(r'^[\s\-_|:,]+|[\s\-_|:,]+$', '', candidate_title).strip()
+
+    title = candidate_title or "Hit Track"
     artist = uploader.replace(' - Topic', '').replace('VEVO', '').strip()
 
-    if '|' in clean:
-        parts = [p.strip() for p in clean.split('|') if p.strip()]
-        if len(parts) >= 2:
-            title = parts[0]
-            artist = parts[1]
-    elif ' - ' in clean:
-        parts = [p.strip() for p in clean.split(' - ') if p.strip()]
-        if len(parts) >= 2:
-            title = parts[1]
-            artist = parts[0]
-    elif ':' in clean:
-        parts = [p.strip() for p in clean.split(':') if p.strip()]
-        if len(parts) >= 2:
-            title = parts[0]
+    if ' | ' in raw_title:
+        parts = [p.strip() for p in raw_title.split(' | ') if p.strip()]
+        if len(parts) >= 2 and len(parts[1]) < 45:
             artist = parts[1]
 
     title = re.sub(r'[\(\[\{\)\]\}]', '', title).strip()
-    return title.strip() or "Track", artist.strip() or "Artist"
+    return title or "Hit Track", artist or "Artist"
 
 def download_audio_and_cover(video_id, out_prefix):
     url = f"https://www.youtube.com/watch?v={video_id}"
@@ -261,6 +263,30 @@ def apply_slowed_reverb(input_audio, output_audio):
     ]
     subprocess.run(cmd, check=True)
 
+def layout_title(title_text, max_w):
+    import textwrap
+    words = title_text.strip().split()
+    # Try single line from large font down to smaller
+    for sz in range(76, 36, -4):
+        font = get_font(sz, bold=True)
+        bbox = font.getbbox(title_text)
+        if bbox[2] - bbox[0] <= max_w:
+            return [title_text], font, sz
+
+    # If single line doesn't fit, wrap into 2 lines
+    for sz in range(68, 36, -4):
+        font = get_font(sz, bold=True)
+        wrap_width = max(12, int(len(title_text) * 0.58))
+        lines = textwrap.wrap(title_text, width=wrap_width)
+        if len(lines) <= 2:
+            w1 = font.getbbox(lines[0])[2] - font.getbbox(lines[0])[0]
+            w2 = font.getbbox(lines[1])[2] - font.getbbox(lines[1])[0] if len(lines) > 1 else 0
+            if max(w1, w2) <= max_w:
+                return lines[:2], font, sz
+
+    font = get_font(40, bold=True)
+    return textwrap.wrap(title_text, width=16)[:2], font, 40
+
 def generate_thumbnail(cover_path, title, artist, output_thumb):
     W, H = 1920, 1080
     bg = Image.new('RGB', (W, H), '#f7f6f0')
@@ -308,19 +334,30 @@ def generate_thumbnail(cover_path, title, artist, output_thumb):
     # Card border
     draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], outline='#dcdad4', width=2)
 
-    # 2. Left Side: Pure Minimalist Typography ("phle jaise simple")
+    # 2. Left Side: Pure Minimalist Typography with Safe Boundary
     left_x = 140
-    font_title = get_font(84, bold=True)
-    font_slowed = get_font(38, bold=True)
-    font_artist = get_font(28, bold=False)
-    font_sub = get_font(22, bold=False)
+    max_w = card_x - left_x - 70  # strictly ends before the card
 
-    title_y = 390
-    draw.text((left_x, title_y), title[:28].upper(), fill='#0f172a', font=font_title)
-    draw.text((left_x, title_y + 105), "( slowed + reverb )", fill='#475569', font=font_slowed)
-    draw.text((left_x, title_y + 165), artist[:35], fill='#64748b', font=font_artist)
+    lines, font_title, title_sz = layout_title(title.upper(), max_w)
+    line_spacing = int(title_sz * 1.15)
+
+    start_y = (H - 560) // 2 + (80 if len(lines) == 1 else 40)
+    curr_y = start_y
+    for line in lines:
+        draw.text((left_x, curr_y), line, fill='#0f172a', font=font_title)
+        curr_y += line_spacing
+
+    font_slowed = get_font(36, bold=True)
+    draw.text((left_x, curr_y + 16), "( slowed + reverb )", fill='#475569', font=font_slowed)
+
+    font_artist = get_font(26, bold=False)
+    clean_artist = artist
+    while font_artist.getbbox(clean_artist)[2] - font_artist.getbbox(clean_artist)[0] > max_w and len(clean_artist) > 10:
+        clean_artist = clean_artist[:-4] + "..."
+    draw.text((left_x, curr_y + 72), clean_artist, fill='#64748b', font=font_artist)
 
     # Watermark
+    font_sub = get_font(22, bold=False)
     draw.text((left_x, H - 130), f"@{CHANNEL_NAME} • 1080P FULL HD • 432HZ", fill='#94a3b8', font=font_sub)
 
     bg.save(output_thumb, quality=95)
