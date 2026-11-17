@@ -293,8 +293,10 @@ def download_audio_and_cover(video_id, out_prefix):
     thumb_template = f"{out_prefix}.%(ext)s"
 
     strategies = [
-        ['yt-dlp', '--remote-components', 'ejs:github'],
-        ['yt-dlp', '--extractor-args', 'youtube:player_client=tv,ios'],
+        ['yt-dlp', '--remote-components', 'ejs:github', '--extractor-args', 'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=tv_embedded,web_embedded'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=web_creator'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=ios,tv'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=mweb,android']
     ]
@@ -316,12 +318,14 @@ def download_audio_and_cover(video_id, out_prefix):
             url
         ]
         try:
-            subprocess.run(cmd, check=True)
+            subprocess.run(cmd, capture_output=True, text=True, check=True)
             download_success = True
             break
         except subprocess.CalledProcessError as e:
             last_err = e
-            print(f"Strategy failed ({base[1:3] if len(base)>2 else base}), trying fallback...")
+            err_msg = (e.stderr or e.stdout or str(e)).strip()
+            last_lines = [l.strip() for l in err_msg.split('\n') if l.strip() and not l.startswith('[download]')][-2:]
+            print(f"Strategy failed ({base[1:3] if len(base)>2 else base}): {' | '.join(last_lines)}")
 
     if not download_success:
         raise last_err or Exception("All download strategies failed.")
