@@ -26,7 +26,7 @@ jobs:
       - name: Set up Deno (YouTube Signature JS Runtime)
         uses: denoland/setup-deno@v1
         with:
-          deno-version: v1.x
+          deno-version: v2.x
 
       - name: Install System Dependencies (FFmpeg & Rubberband)
         run: |
@@ -36,7 +36,7 @@ jobs:
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt --upgrade yt-dlp
+          pip install -r requirements.txt --upgrade "yt-dlp[default]"
 
       - name: Restore YouTube OAuth Credentials & Cookies from Secrets
         env:

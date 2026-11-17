@@ -125,7 +125,7 @@ def search_trending_songs(max_count=4):
             q = q_list[current_q_idx]
             cat_indices[c_idx] += 1
             if os.path.exists('cookies.txt'):
-                cookie_and_extractor_args = ['--cookies', 'cookies.txt']
+                cookie_and_extractor_args = ['--cookies', 'cookies.txt', '--remote-components', 'ejs:github']
             else:
                 cookie_and_extractor_args = ['--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs']
 
@@ -233,7 +233,7 @@ def download_audio_and_cover(video_id, out_prefix):
     thumb_template = f"{out_prefix}.%(ext)s"
 
     if os.path.exists('cookies.txt'):
-        cookie_and_extractor_args = ['--cookies', 'cookies.txt']
+        cookie_and_extractor_args = ['--cookies', 'cookies.txt', '--remote-components', 'ejs:github']
     else:
         cookie_and_extractor_args = ['--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data']
 
