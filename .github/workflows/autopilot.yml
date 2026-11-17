@@ -39,9 +39,12 @@ jobs:
           pip install -r requirements.txt --upgrade "yt-dlp[default]" bgutil-ytdlp-pot-provider
 
       - name: Start YouTube BotGuard PO-Token Provider (Cloud Anti-Bot Bypass)
+        continue-on-error: true
         run: |
-          docker run -d --name pot-provider -p 4416:4416 ghcr.io/brainicism/bgutil-ytdlp-pot-provider:node
-          sleep 4
+          wget -q https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs/releases/latest/download/bgutil-pot-linux-x86_64 -O bgutil-pot
+          chmod +x bgutil-pot
+          ./bgutil-pot server --host 127.0.0.1 --port 4416 &
+          sleep 3
 
       - name: Restore YouTube OAuth Credentials & Cookies from Secrets
         env:
