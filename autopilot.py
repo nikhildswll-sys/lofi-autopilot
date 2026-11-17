@@ -17,6 +17,7 @@ import time
 import subprocess
 import glob
 import random
+import re
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -67,6 +68,7 @@ def get_ytdlp_base_cmd(for_search=False):
 def search_trending_songs(max_count=4):
     history = load_history()
     done_ids = set(item.get('id') for item in history if isinstance(item, dict))
+    done_titles = set(re.sub(r'[^a-z0-9]', '', (item.get('title') or '').lower()) for item in history if isinstance(item, dict) and item.get('title'))
 
     # All defined categories in standard rotation order
     all_categories = [
@@ -248,6 +250,11 @@ def search_trending_songs(max_count=4):
                     if vid_id in done_ids:
                         continue
 
+                    # Clean check for duplicate title already uploaded
+                    raw_title_clean = re.sub(r'[^a-z0-9]', '', raw_title.lower())
+                    if any(t in raw_title_clean for t in done_titles if len(t) >= 6):
+                        continue
+
                     # Single original tracks must be 110s - 360s
                     if duration > 0 and (duration < 110 or duration > 360):
                         continue
@@ -273,6 +280,8 @@ def search_trending_songs(max_count=4):
                         'category': cat['name']
                     })
                     done_ids.add(vid_id)
+                    if norm_cand_title:
+                        done_titles.add(norm_cand_title)
                     print(f" -> Selected [{cat['name']}]: {raw_title[:60]} ({uploader}) [{int(duration)}s] [views: {view_count}]")
                     found_in_pass = True
                     break
