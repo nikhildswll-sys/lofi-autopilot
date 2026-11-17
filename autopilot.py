@@ -127,7 +127,7 @@ def search_trending_songs(max_count=4):
             if q.startswith('http'):
                 cmd = [
                     'yt-dlp',
-                    '--extractor-args', 'youtube:player_client=android,web',
+                    '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs',
                     '--flat-playlist',
                     '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
                     '--playlist-end', '15',
@@ -136,7 +136,7 @@ def search_trending_songs(max_count=4):
             else:
                 cmd = [
                     'yt-dlp',
-                    '--extractor-args', 'youtube:player_client=android,web',
+                    '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs',
                     '--flat-playlist',
                     '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
                     f'ytsearch12:{q}'
@@ -229,7 +229,7 @@ def download_audio_and_cover(video_id, out_prefix):
 
     cmd = [
         'yt-dlp',
-        '--extractor-args', 'youtube:player_client=android,web',
+        '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data',
         '--extract-audio',
         '--audio-format', 'mp3',
         '--audio-quality', '0',
