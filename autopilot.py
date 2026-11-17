@@ -71,26 +71,55 @@ def search_trending_songs(max_count=4):
     # All defined categories in standard rotation order
     all_categories = [
         {
-            'name': 'Punjabi',
+            'name': 'Punjabi & Desi Hip Hop',
             'queries': [
-                'https://www.youtube.com/results?search_query=latest+punjabi+song+official+music+video&sp=CAI%3D',
-                'latest punjabi hit songs official music video',
-                'karan aujla hit official music video',
+                'karan aujla official music video',
                 'sidhu moose wala hit official music video',
-                'ap dhillon hit official music video',
-                'amrinder gill hit romantic songs official video'
+                'dhanda nyoliwala official video',
+                'shubh official music video',
+                'ap dhillon official music video',
+                'diljit dosanjh official music video',
+                'karan aujla winning speech official video',
+                'karan aujla tauba tauba official video',
+                'sidhu moose wala 295 official video',
+                'dhanda nyoliwala no favours official video',
+                'shubh cheques official music video',
+                'ap dhillon excuses official music video',
+                'divine hip hop official video',
+                'seedhe maut official music video',
+                'king hip hop official music video'
+            ]
+        },
+        {
+            'name': 'Haryanvi & NCR Hip Hop',
+            'queries': [
+                'dhanda nyoliwala official video',
+                'dhanda nyoliwala russian bandana official video',
+                'dhanda nyoliwala block life official video',
+                'dhanda nyoliwala chhore ncr aale official video',
+                'masoom sharma hit haryanvi official video',
+                'gulzaar chhaniwala official video',
+                'khasa aala chahar official video',
+                'renuka panwar hit official video',
+                'bintu pabra official video'
             ]
         },
         {
             'name': 'Hindi (2000s-2020s Hits, No 90s)',
             'queries': [
-                'https://www.youtube.com/results?search_query=latest+hindi+songs+official+music+video&sp=CAI%3D',
-                'latest hindi songs official music video',
-                'atif aslam hit official music video',
-                'emraan hashmi hit songs official video',
+                'arijit singh hit official music video tseries',
+                'atif aslam hit official music video tips',
+                'pritam hit songs official video tseries',
+                'vishal mishra official music video',
+                'darshan raval official music video',
+                'emraan hashmi zara sa official video',
+                'emraan hashmi dil ibadat official video',
+                'emraan hashmi hale dil official video',
+                'emraan hashmi pee loon official video',
+                'emraan hashmi tu hi meri shab hai official video',
+                'emraan hashmi jannat official video',
                 'kk romantic hit songs official video',
-                'mohit chauhan hit songs official video',
-                'arijit singh hit songs official video'
+                'mohit chauhan hit songs official video'
             ]
         },
         {
@@ -104,21 +133,10 @@ def search_trending_songs(max_count=4):
                 'angreji beat official video honey singh gippy',
                 'kala chashma official video baar baar dekho',
                 'illegal weapon official video jasmine sandlas garry',
-                'balam thanedar official video dinesh goliya',
-                '52 gaj ka daman official video renuka panwar',
                 'hookah bar official video khiladi 786',
-                'chinta ta ta chita chita official video rowdy rathore'
-            ]
-        },
-        {
-            'name': 'Haryanvi',
-            'queries': [
-                'https://www.youtube.com/results?search_query=latest+haryanvi+song+official+music+video&sp=CAI%3D',
-                'trending haryanvi song official music video',
-                'masoom sharma hit haryanvi official video',
-                'renuka panwar hit haryanvi official video',
-                'dhanda nyoliwala hit official video',
-                'superhit haryanvi songs official music video'
+                'char botal vodka official video honey singh',
+                'blue eyes official video honey singh',
+                'dheere dheere se meri zindagi honey singh official video'
             ]
         }
     ]
@@ -132,7 +150,7 @@ def search_trending_songs(max_count=4):
         elif isinstance(item, dict):
             t = (item.get('title', '') + ' ' + item.get('artist', '')).lower()
             if any(k in t for k in ['renuka', 'masoom', 'dhanda', 'aarju', 'geeta', 'pranjal', 'haryanvi', 'kabootar', 'kood']):
-                last_cat = 'Haryanvi'
+                last_cat = 'Haryanvi & NCR Hip Hop'
                 break
             elif any(k in t for k in ['daddy mummy', 'subah hone na de', 'proper patola', 'baby doll']):
                 last_cat = 'Iconic Bangers & Nostalgia (Famous Party & Cult Hits)'
@@ -140,8 +158,8 @@ def search_trending_songs(max_count=4):
             elif any(k in t for k in ['mashooqa', 'atif', 'arijit', 'emraan', 'pritam']):
                 last_cat = 'Hindi (2000s-2020s Hits, No 90s)'
                 break
-            elif any(k in t for k in ['diljit', 'karan aujla', 'moose', 'ap dhillon', 'punjabi', 'deep money']):
-                last_cat = 'Punjabi'
+            elif any(k in t for k in ['diljit', 'karan aujla', 'moose', 'ap dhillon', 'punjabi', 'deep money', 'shubh']):
+                last_cat = 'Punjabi & Desi Hip Hop'
                 break
 
     cat_names = [c['name'] for c in all_categories]
@@ -159,7 +177,11 @@ def search_trending_songs(max_count=4):
         '2 hour', '3 hour', 'all songs', 'top songs', 'best of',
         'audio jukebox', 'full album', 'soundtrack', 'playlist', 'live',
         '90s', '90’s', '1990s', 'retro', 'purane', 'old hindi songs',
-        'kishore kumar', 'lata mangeshkar', 'mohammed rafi', 'mukesh'
+        'kishore kumar', 'lata mangeshkar', 'mohammed rafi', 'mukesh',
+        'ai song', 'ai cover', 'ai version', 'ai generated', 'artificial intelligence',
+        'fan made', 'fanmade', 'concept', 'unreleased', 'teaser', 'trailer',
+        'status', 'shorts', 'whatsapp', 'ringtone', 'cover song', 'tribute',
+        'vatsal bhoya', 'prakash jojawar', 'reaction', 'review', 'vlog'
     ]
 
     selected_songs = []
