@@ -1,6 +1,8 @@
 # Sensitive Credentials - NEVER COMMIT TO PUBLIC REPO
 client_secrets.json
 token.json
+cookies.txt
+*cookies*
 *.json.bak
 .env
 
