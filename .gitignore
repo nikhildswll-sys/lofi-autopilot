@@ -1,0 +1,23 @@
+# Sensitive Credentials - NEVER COMMIT TO PUBLIC REPO
+client_secrets.json
+token.json
+*.json.bak
+.env
+
+# Media Files & Temp Folders
+workspace/
+ready_to_upload/
+*.mp3
+*.mp4
+*.webm
+*.jpg
+*.jpeg
+*.png
+*.webp
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.log
