@@ -2,8 +2,8 @@ name: YouTube Lo-Fi Autopilot
 
 on:
   schedule:
-    # Runs twice daily at 06:00 UTC and 18:00 UTC (11:30 AM and 11:30 PM IST)
-    - cron: '0 6,18 * * *'
+    # Runs every 3 hours round-the-clock (Fresh Release Radar)
+    - cron: '0 */3 * * *'
   workflow_dispatch: # Allows manual 1-click trigger anytime from GitHub Actions tab
 
 permissions:
@@ -47,9 +47,9 @@ jobs:
           echo "$TOKEN_JSON" > token.json
           echo "Credentials restored successfully without exposing secrets in logs."
 
-      - name: Run Autopilot Bot
+      - name: Run Autopilot Bot (Fresh Release Radar)
         run: |
-          python autopilot.py
+          python autopilot.py --count 1
 
       - name: Clean sensitive credentials before finish
         if: always()

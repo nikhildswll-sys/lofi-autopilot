@@ -48,11 +48,12 @@ def search_trending_songs(max_count=4):
     history = load_history()
     done_ids = set(item.get('id') for item in history if isinstance(item, dict))
 
-    # Multi-language pools: Haryanvi, Punjabi, Hindi (Trending first, then famous 2000s-2020s hits, strictly NO 90s)
+    # Multi-language pools with Fresh Release Radar (Sort by Date First)
     categories = [
         {
             'name': 'Haryanvi',
             'queries': [
+                'https://www.youtube.com/results?search_query=latest+haryanvi+song+official+music+video&sp=CAI%3D',
                 'trending haryanvi song official music video',
                 'masoom sharma hit haryanvi official video',
                 'renuka panwar hit haryanvi official video',
@@ -63,6 +64,7 @@ def search_trending_songs(max_count=4):
         {
             'name': 'Punjabi',
             'queries': [
+                'https://www.youtube.com/results?search_query=latest+punjabi+song+official+music+video&sp=CAI%3D',
                 'latest punjabi hit songs official music video',
                 'karan aujla hit official music video',
                 'sidhu moose wala hit official music video',
@@ -73,6 +75,7 @@ def search_trending_songs(max_count=4):
         {
             'name': 'Hindi (2000s-2020s Hits, No 90s)',
             'queries': [
+                'https://www.youtube.com/results?search_query=latest+hindi+songs+official+music+video&sp=CAI%3D',
                 'latest hindi songs official music video',
                 'atif aslam hit official music video',
                 'emraan hashmi hit songs official video',
@@ -93,7 +96,7 @@ def search_trending_songs(max_count=4):
     ]
 
     selected = []
-    print(f"Finding original standalone songs (Haryanvi, Punjabi, Hindi Trending + 2000s Hits, No 90s)...")
+    print(f"Scanning Fresh Release Radar & Trending Hits (Haryanvi, Punjabi, Hindi)...")
 
     cat_indices = {i: 0 for i in range(len(categories))}
     passes = 0
@@ -110,12 +113,21 @@ def search_trending_songs(max_count=4):
 
             q = q_list[current_q_idx]
             cat_indices[c_idx] += 1
-            cmd = [
-                'yt-dlp',
-                '--flat-playlist',
-                '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
-                f'ytsearch12:{q}'
-            ]
+            if q.startswith('http'):
+                cmd = [
+                    'yt-dlp',
+                    '--flat-playlist',
+                    '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
+                    '--playlist-end', '15',
+                    q
+                ]
+            else:
+                cmd = [
+                    'yt-dlp',
+                    '--flat-playlist',
+                    '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
+                    f'ytsearch12:{q}'
+                ]
             try:
                 res = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 for line in res.stdout.strip().split('\n'):
