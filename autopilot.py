@@ -230,33 +230,32 @@ def download_audio_and_cover(video_id, out_prefix):
 
 def apply_slowed_reverb(input_audio, output_audio):
     """
-    Advanced Anti-Copyright Audio DSP (Acoustic Camouflage + Lo-Fi Texture):
-    - Independent pitch transposition (-2 semitones) via librubberband
-    - Unpredictable randomized micro-tempo (0.865 - 0.885)
-    - Low-pass filter (4300Hz) cutting high-frequency spectral hash spikes
-    - Stereo chorus phase modulation (defeats waveform correlation)
-    - Dual-tap cathedral reverb (smears audio transients/drums)
-    - Synthetic brown noise rain/vinyl texture (-24dB) destroying peak hash matches
-    - Peak-safe limiter (-1.0dB)
+    Crystal-Clear Aesthetic Slowed + Reverb DSP:
+    - Natural tape speed & pitch drop (asetrate ~0.865x)
+    - 432Hz micro-retuning (*0.996)
+    - Vocal Presence Boost (+2.5dB at 2800Hz) so voice cuts through loud & crisp!
+    - Warm Sub-Bass boost (+3.5dB at 85Hz) for deep lo-fi punch
+    - Smooth high-shelf (-1.5dB at 9500Hz) preventing harshness without muffling
+    - Lush cathedral reverb with stereo delay (aecho 60ms & 120ms)
+    - Volume boost (+25%) with studio limiter (-0.5dB) for loud, crystal-clear playback
     """
-    pitch_factor = round(random.uniform(0.885, 0.902), 4)
-    tempo_factor = round(random.uniform(0.865, 0.885), 4)
+    speed = round(random.uniform(0.855, 0.875), 4)
+    print(f"Applying Crystal-Clear Slowed+Reverb DSP (Speed: {speed}x, Vocal Boost +2.5dB, 432Hz)...")
 
-    print(f"Applying Anti-Copyright Audio Camouflage (Pitch: {pitch_factor}, Tempo: {tempo_factor}, Lo-Fi Rain/Vinyl Layer)...")
     filter_complex = (
-        f"[0:a]rubberband=pitch={pitch_factor}:tempo={tempo_factor},"
-        f"lowpass=f=4300,highpass=f=50,chorus=0.6:0.8:40:0.3:0.25:2,"
-        f"aecho=0.8:0.8:60|130:0.32|0.22[main];"
-        f"anoisesrc=d=600:c=brown:r=44100:a=0.012,lowpass=f=2200,volume=-24dB[noise];"
-        f"[main][noise]amix=inputs=2:duration=first:dropout_transition=2,"
-        f"alimiter=limit=-1.0dB[out]"
+        f"[0:a]asetrate=44100*{speed}*0.996,aresample=44100,"
+        f"equalizer=f=85:width_type=o:width=1.8:g=3.5,"
+        f"equalizer=f=2800:width_type=o:width=1.5:g=2.5,"
+        f"equalizer=f=9500:width_type=o:width=2.0:g=-1.5,"
+        f"aecho=0.8:0.85:60:0.25,aecho=0.8:0.75:120:0.18,"
+        f"volume=1.25,alimiter=limit=-0.5dB:level=disabled[a]"
     )
 
     cmd = [
         'ffmpeg', '-y',
         '-i', input_audio,
         '-filter_complex', filter_complex,
-        '-map', '[out]',
+        '-map', '[a]',
         '-b:a', '320k',
         output_audio
     ]
@@ -337,6 +336,7 @@ def generate_video(audio_path, thumbnail_path, output_video):
         '-i', thumbnail_path,
         '-i', audio_path,
         '-c:v', 'libx264',
+        '-preset', 'ultrafast',
         '-tune', 'stillimage',
         '-c:a', 'aac',
         '-b:a', '320k',

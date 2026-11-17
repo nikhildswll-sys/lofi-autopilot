@@ -222,28 +222,25 @@ def process_song(song_item):
     thumb_candidates = glob.glob(f"{raw_prefix}*.jpg") + glob.glob(f"{raw_prefix}*.webp") + glob.glob(f"{raw_prefix}*.png")
     cover_img = thumb_candidates[0] if thumb_candidates else None
 
-    # 2. Advanced Anti-Copyright Audio DSP (Acoustic Camouflage + Lo-Fi Texture)
+    # 2. Crystal-Clear Aesthetic Slowed + Reverb DSP
     slowed_audio = os.path.join(song_dir, "audio_slowed_reverb.mp3")
-    
-    # Randomize micro-pitch and tempo per song so every track has an unpredictable acoustic fingerprint
-    pitch_factor = round(random.uniform(0.885, 0.902), 4)  # ~ -2 semitones key transposition
-    tempo_factor = round(random.uniform(0.865, 0.885), 4)  # ~13% slowed down
+    speed = round(random.uniform(0.855, 0.875), 4)
+    print(f"Applying Crystal-Clear Slowed+Reverb DSP (Speed: {speed}x, Vocal Boost +2.5dB, 432Hz)...")
 
-    print(f"Applying Anti-Copyright Audio Camouflage (Pitch: {pitch_factor}, Tempo: {tempo_factor}, Lo-Fi Rain/Vinyl Layer)...")
     filter_complex = (
-        f"[0:a]rubberband=pitch={pitch_factor}:tempo={tempo_factor},"
-        f"lowpass=f=4300,highpass=f=50,chorus=0.6:0.8:40:0.3:0.25:2,"
-        f"aecho=0.8:0.8:60|130:0.32|0.22[main];"
-        f"anoisesrc=d=600:c=brown:r=44100:a=0.012,lowpass=f=2200,volume=-24dB[noise];"
-        f"[main][noise]amix=inputs=2:duration=first:dropout_transition=2,"
-        f"alimiter=limit=-1.0dB[out]"
+        f"[0:a]asetrate=44100*{speed}*0.996,aresample=44100,"
+        f"equalizer=f=85:width_type=o:width=1.8:g=3.5,"
+        f"equalizer=f=2800:width_type=o:width=1.5:g=2.5,"
+        f"equalizer=f=9500:width_type=o:width=2.0:g=-1.5,"
+        f"aecho=0.8:0.85:60:0.25,aecho=0.8:0.75:120:0.18,"
+        f"volume=1.25,alimiter=limit=-0.5dB:level=disabled[a]"
     )
 
     ffmpeg_audio_cmd = [
         'ffmpeg', '-y',
         '-i', raw_audio,
         '-filter_complex', filter_complex,
-        '-map', '[out]',
+        '-map', '[a]',
         '-b:a', '320k',
         slowed_audio
     ]
@@ -303,6 +300,7 @@ def process_song(song_item):
         '-i', final_thumb,
         '-i', slowed_audio,
         '-c:v', 'libx264',
+        '-preset', 'ultrafast',
         '-tune', 'stillimage',
         '-c:a', 'aac',
         '-b:a', '320k',
