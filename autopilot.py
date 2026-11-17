@@ -67,19 +67,8 @@ def search_trending_songs(max_count=4):
     history = load_history()
     done_ids = set(item.get('id') for item in history if isinstance(item, dict))
 
-    # Multi-language pools with Fresh Release Radar (Sort by Date First)
-    categories = [
-        {
-            'name': 'Haryanvi',
-            'queries': [
-                'https://www.youtube.com/results?search_query=latest+haryanvi+song+official+music+video&sp=CAI%3D',
-                'trending haryanvi song official music video',
-                'masoom sharma hit haryanvi official video',
-                'renuka panwar hit haryanvi official video',
-                'dhanda nyoliwala hit official video',
-                'superhit haryanvi songs official music video'
-            ]
-        },
+    # All defined categories in standard rotation order
+    all_categories = [
         {
             'name': 'Punjabi',
             'queries': [
@@ -119,8 +108,49 @@ def search_trending_songs(max_count=4):
                 'hookah bar official video khiladi 786',
                 'chinta ta ta chita chita official video rowdy rathore'
             ]
+        },
+        {
+            'name': 'Haryanvi',
+            'queries': [
+                'https://www.youtube.com/results?search_query=latest+haryanvi+song+official+music+video&sp=CAI%3D',
+                'trending haryanvi song official music video',
+                'masoom sharma hit haryanvi official video',
+                'renuka panwar hit haryanvi official video',
+                'dhanda nyoliwala hit official video',
+                'superhit haryanvi songs official music video'
+            ]
         }
     ]
+
+    # Rotate categories strictly round-robin based on last upload
+    last_cat = None
+    for item in reversed(history):
+        if isinstance(item, dict) and item.get('category'):
+            last_cat = item.get('category')
+            break
+        elif isinstance(item, dict):
+            t = (item.get('title', '') + ' ' + item.get('artist', '')).lower()
+            if any(k in t for k in ['renuka', 'masoom', 'dhanda', 'aarju', 'geeta', 'pranjal', 'haryanvi', 'kabootar', 'kood']):
+                last_cat = 'Haryanvi'
+                break
+            elif any(k in t for k in ['daddy mummy', 'subah hone na de', 'proper patola', 'baby doll']):
+                last_cat = 'Iconic Bangers & Nostalgia (Famous Party & Cult Hits)'
+                break
+            elif any(k in t for k in ['mashooqa', 'atif', 'arijit', 'emraan', 'pritam']):
+                last_cat = 'Hindi (2000s-2020s Hits, No 90s)'
+                break
+            elif any(k in t for k in ['diljit', 'karan aujla', 'moose', 'ap dhillon', 'punjabi', 'deep money']):
+                last_cat = 'Punjabi'
+                break
+
+    cat_names = [c['name'] for c in all_categories]
+    if last_cat in cat_names:
+        next_idx = (cat_names.index(last_cat) + 1) % len(cat_names)
+    else:
+        next_idx = 0
+
+    categories = all_categories[next_idx:] + all_categories[:next_idx]
+    print(f"Genre Rotation: Last upload was '{last_cat}' -> Prioritizing '{categories[0]['name']}' for this run!")
 
     BANNED_KEYWORDS = [
         'slowed', 'reverb', 'lofi', 'lo-fi', 'jukebox', 'mashup',
@@ -583,6 +613,7 @@ If you loved the sound, please Drop a Like 👍, Comment your favorite lyric, an
         'id': vid_id,
         'title': title,
         'artist': artist,
+        'category': song_item.get('category', 'Unknown'),
         'uploaded_yt_id': uploaded_id,
         'timestamp': int(time.time())
     }
