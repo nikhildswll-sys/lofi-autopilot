@@ -2,8 +2,8 @@ name: YouTube Lo-Fi Autopilot
 
 on:
   schedule:
-    # Runs every 3 hours round-the-clock (Fresh Release Radar)
-    - cron: '0 */3 * * *'
+    # Runs every 3 hours round-the-clock (Shifted by 15 mins to bypass GitHub Actions peak queue delay)
+    - cron: '15 */3 * * *'
   workflow_dispatch: # Allows manual 1-click trigger anytime from GitHub Actions tab
 
 permissions:
