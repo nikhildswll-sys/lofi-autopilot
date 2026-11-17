@@ -73,18 +73,16 @@ def search_trending_songs(max_count=4):
         {
             'name': 'Punjabi & Desi Hip Hop',
             'queries': [
+                'trending punjabi songs official music video',
+                'latest punjabi hits official video',
+                'trending desi hip hop official music video',
+                'punjabi top hits official music video',
                 'karan aujla official music video',
-                'sidhu moose wala hit official music video',
-                'dhanda nyoliwala official video',
+                'diljit dosanjh official music video',
+                'sidhu moose wala official music video',
                 'shubh official music video',
                 'ap dhillon official music video',
-                'diljit dosanjh official music video',
-                'karan aujla winning speech official video',
-                'karan aujla tauba tauba official video',
-                'sidhu moose wala 295 official video',
-                'dhanda nyoliwala no favours official video',
-                'shubh cheques official music video',
-                'ap dhillon excuses official music video',
+                'dhanda nyoliwala official video',
                 'divine hip hop official video',
                 'seedhe maut official music video',
                 'king hip hop official music video'
@@ -93,23 +91,27 @@ def search_trending_songs(max_count=4):
         {
             'name': 'Haryanvi & NCR Hip Hop',
             'queries': [
+                'trending haryanvi songs official music video',
+                'latest haryanvi hits official video',
+                'haryanvi hit songs official video',
                 'dhanda nyoliwala official video',
-                'dhanda nyoliwala russian bandana official video',
-                'dhanda nyoliwala block life official video',
-                'dhanda nyoliwala chhore ncr aale official video',
-                'masoom sharma hit haryanvi official video',
+                'masoom sharma official video',
                 'gulzaar chhaniwala official video',
                 'khasa aala chahar official video',
-                'renuka panwar hit official video',
-                'bintu pabra official video'
+                'renuka panwar official video',
+                'bintu pabra official video',
+                'ajay hooda official video'
             ]
         },
         {
             'name': 'Hindi (2000s-2020s Hits, No 90s)',
             'queries': [
-                'arijit singh hit official music video tseries',
-                'atif aslam hit official music video tips',
-                'pritam hit songs official video tseries',
+                'trending hindi songs official music video',
+                'latest bollywood songs official music video',
+                'latest hindi songs official music video tseries',
+                'arijit singh hit official music video',
+                'atif aslam hit official music video',
+                'pritam hit songs official video',
                 'vishal mishra official music video',
                 'darshan raval official music video',
                 'emraan hashmi zara sa official video',
@@ -181,8 +183,10 @@ def search_trending_songs(max_count=4):
         'ai song', 'ai cover', 'ai version', 'ai generated', 'artificial intelligence',
         'fan made', 'fanmade', 'concept', 'unreleased', 'teaser', 'trailer',
         'status', 'shorts', 'whatsapp', 'ringtone', 'cover song', 'tribute',
-        'vatsal bhoya', 'prakash jojawar', 'reaction', 'review', 'vlog'
+        'vatsal bhoya', 'prakash jojawar', 'reaction', 'review', 'vlog',
+        'suno', 'udio', 'karaoke', 'instrumental'
     ]
+    BANNED_CHANNELS = ['vatsal bhoya', 'prakash jojawar']
 
     selected_songs = []
     print(f"Scanning Fresh Release Radar & Trending Hits (Haryanvi, Punjabi, Hindi)...")
@@ -207,7 +211,7 @@ def search_trending_songs(max_count=4):
                 cmd = [
                     *base_cmd,
                     '--flat-playlist',
-                    '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
+                    '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s|||%(view_count)s',
                     '--playlist-end', '15',
                     q
                 ]
@@ -215,7 +219,7 @@ def search_trending_songs(max_count=4):
                 cmd = [
                     *base_cmd,
                     '--flat-playlist',
-                    '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s',
+                    '--print', '%(id)s|||%(title)s|||%(uploader)s|||%(duration)s|||%(view_count)s',
                     f'ytsearch12:{q}'
                 ]
             try:
@@ -232,19 +236,33 @@ def search_trending_songs(max_count=4):
                     uploader = parts[2].strip()
 
                     try:
-                        duration = float(parts[3].strip()) if len(parts) > 3 and parts[3].strip() else 0
+                        duration = float(parts[3].strip()) if len(parts) > 3 and parts[3].strip() and parts[3].strip() != 'NA' else 0
                     except ValueError:
                         duration = 0
+
+                    try:
+                        view_count = int(parts[4].strip()) if len(parts) > 4 and parts[4].strip() and parts[4].strip() != 'NA' else 0
+                    except ValueError:
+                        view_count = 0
 
                     if vid_id in done_ids:
                         continue
 
-                    # Single original tracks must be 110s - 340s
-                    if duration > 0 and (duration < 110 or duration > 340):
+                    # Single original tracks must be 110s - 360s
+                    if duration > 0 and (duration < 110 or duration > 360):
                         continue
 
                     t_lower = raw_title.lower()
+                    u_lower = uploader.lower()
                     if any(k in t_lower for k in BANNED_KEYWORDS):
+                        continue
+                    if any(k in u_lower for k in BANNED_CHANNELS):
+                        continue
+                    if any(k in u_lower for k in ['status', 'shorts', 'reels', 'ai ', ' ai', 'fan club', 'edits']):
+                        continue
+
+                    # Block low-view spam / fake AI tracks (real trending hits have >= 50k views)
+                    if view_count > 0 and view_count < 50000:
                         continue
 
                     selected_songs.append({
@@ -255,7 +273,7 @@ def search_trending_songs(max_count=4):
                         'category': cat['name']
                     })
                     done_ids.add(vid_id)
-                    print(f" -> Selected [{cat['name']}]: {raw_title[:60]} ({uploader}) [{int(duration)}s]")
+                    print(f" -> Selected [{cat['name']}]: {raw_title[:60]} ({uploader}) [{int(duration)}s] [views: {view_count}]")
                     found_in_pass = True
                     break
             except Exception as e:
