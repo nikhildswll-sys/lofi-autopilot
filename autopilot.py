@@ -445,76 +445,141 @@ def layout_title(title_text, max_w):
 
 def generate_thumbnail(cover_path, title, artist, output_thumb):
     W, H = 1920, 1080
-    bg = Image.new('RGB', (W, H), '#f7f6f0')
+    bg = Image.new('RGB', (W, H), '#08090d')
 
-    # Ambient cover blur background
+    # 1. Rich Blurred Atmospheric Cover Background
     if cover_path and os.path.exists(cover_path):
         try:
-            cov = Image.open(cover_path).convert('RGB')
-            cov_blur = cov.resize((int(W * 1.3), int(H * 1.3))).filter(ImageFilter.GaussianBlur(radius=55))
-            bg.paste(cov_blur, (-100, -100))
-            # Overlay ivory cream wash
-            overlay = Image.new('RGBA', (W, H), (252, 251, 247, 230))
-            bg.paste(overlay, (0, 0), overlay)
+            cov_raw = Image.open(cover_path).convert('RGB')
+            cov_ratio = cov_raw.width / cov_raw.height
+            target_ratio = W / H
+            if cov_ratio > target_ratio:
+                new_h = H
+                new_w = int(H * cov_ratio)
+            else:
+                new_w = W
+                new_h = int(W / cov_ratio)
+            cov_scaled = cov_raw.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            crop_x = (new_w - W) // 2
+            crop_y = (new_h - H) // 2
+            cov_cropped = cov_scaled.crop((crop_x, crop_y, crop_x + W, crop_y + H))
+            cov_blurred = cov_cropped.filter(ImageFilter.GaussianBlur(radius=35))
+
+            # Dark moody overlay
+            dark_mask = Image.new('RGBA', (W, H), (8, 10, 16, 205))
+            cov_blurred.paste(dark_mask, (0, 0), dark_mask)
+            bg.paste(cov_blurred, (0, 0))
         except Exception as e:
-            print(f"Cover blur error: {e}")
+            print(f"Cover BG error: {e}")
+
+    # Add left-to-right dark gradient so text side has pure contrast
+    grad = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    g_draw = ImageDraw.Draw(grad)
+    for x in range(int(W * 0.7)):
+        alpha = int(195 * (1 - x / (W * 0.7)))
+        g_draw.line([(x, 0), (x, H)], fill=(5, 6, 10, alpha))
+    bg.paste(grad, (0, 0), grad)
 
     draw = ImageDraw.Draw(bg)
 
-    # 1. Right Side: Card Artwork + Vinyl Peek
-    card_size = 560
-    card_x = W - card_size - 140
+    # 2. Right Side: Large, High-Impact Album Cover Card (720x720)
+    card_size = 720
+    card_x = W - card_size - 110
     card_y = (H - card_size) // 2
 
-    # Vinyl circle behind card
-    vinyl_x = card_x + int(card_size * 0.72)
-    vinyl_y = card_y + card_size // 2
-    vr = int(card_size * 0.46)
-    draw.ellipse([vinyl_x - vr, vinyl_y - vr, vinyl_x + vr, vinyl_y + vr], fill='#121217')
-    # Vinyl grooves
-    for r in range(70, vr - 10, 12):
-        draw.ellipse([vinyl_x - r, vinyl_y - r, vinyl_x + r, vinyl_y + r], outline='#2a2a32', width=1)
-    draw.ellipse([vinyl_x - 45, vinyl_y - 45, vinyl_x + 45, vinyl_y + 45], fill='#f5f3ec')
-    draw.ellipse([vinyl_x - 10, vinyl_y - 10, vinyl_x + 10, vinyl_y + 10], fill='#111116')
+    # Shadow behind card
+    shadow_pad = 25
+    shadow_img = Image.new('RGBA', (card_size + shadow_pad * 2, card_size + shadow_pad * 2), (0, 0, 0, 0))
+    s_draw = ImageDraw.Draw(shadow_img)
+    s_draw.rectangle([shadow_pad - 10, shadow_pad - 10, card_size + shadow_pad + 10, card_size + shadow_pad + 10], fill=(0, 0, 0, 160))
+    shadow_img = shadow_img.filter(ImageFilter.GaussianBlur(radius=20))
+    bg.paste(shadow_img, (card_x - shadow_pad, card_y - shadow_pad), shadow_img)
 
-    # Front Album Card
     if cover_path and os.path.exists(cover_path):
         try:
-            cov = Image.open(cover_path).convert('RGB').resize((card_size, card_size), Image.Resampling.LANCZOS)
-            bg.paste(cov, (card_x, card_y))
-        except Exception:
-            draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], fill='#e2e8f0')
+            cov = Image.open(cover_path).convert('RGB')
+            min_dim = min(cov.width, cov.height)
+            cx, cy = cov.width // 2, cov.height // 2
+            cov_sq = cov.crop((cx - min_dim // 2, cy - min_dim // 2, cx + min_dim // 2, cy + min_dim // 2))
+            cov_sq = cov_sq.resize((card_size, card_size), Image.Resampling.LANCZOS)
+            bg.paste(cov_sq, (card_x, card_y))
+            draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], outline='#ffffff40', width=3)
+        except Exception as e:
+            print(f"Cover Card error: {e}")
+            draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], fill='#1e293b')
     else:
-        draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], fill='#e2e8f0')
+        draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], fill='#1e293b')
 
-    # Card border
-    draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], outline='#dcdad4', width=2)
+    # 3. Left Side: High-Impact Bold Typography
+    left_x = 110
+    max_text_w = card_x - left_x - 50
 
-    # 2. Left Side: Pure Minimalist Typography with Safe Boundary
-    left_x = 140
-    max_w = card_x - left_x - 70  # strictly ends before the card
+    # Pill badge
+    pill_text = 'LATE NIGHT LO-FI • 432Hz'
+    f_pill = get_font(24, bold=True)
+    bbox = f_pill.getbbox(pill_text)
+    pw = bbox[2] - bbox[0] + 32
+    ph = bbox[3] - bbox[1] + 18
+    pill_y = card_y + 40
+    draw.rounded_rectangle([left_x, pill_y, left_x + pw, pill_y + ph], radius=10, fill='#1e2230', outline='#3b82f6', width=2)
+    draw.text((left_x + 16, pill_y + 8), pill_text, fill='#60a5fa', font=f_pill)
 
-    lines, font_title, title_sz = layout_title(title.upper(), max_w)
-    line_spacing = int(title_sz * 1.15)
+    # Title (Large, Bold, Pure White)
+    title_y = pill_y + ph + 35
+    f_title = get_font(80, bold=True)
 
-    start_y = (H - 560) // 2 + (80 if len(lines) == 1 else 40)
-    curr_y = start_y
-    for line in lines:
-        draw.text((left_x, curr_y), line, fill='#0f172a', font=font_title)
-        curr_y += line_spacing
+    words = title.upper().split()
+    lines = []
+    curr_line = ''
+    for w in words:
+        test_line = f'{curr_line} {w}'.strip()
+        if f_title.getbbox(test_line)[2] - f_title.getbbox(test_line)[0] <= max_text_w:
+            curr_line = test_line
+        else:
+            if curr_line:
+                lines.append(curr_line)
+            curr_line = w
+    if curr_line:
+        lines.append(curr_line)
+    if len(lines) > 2:
+        f_title = get_font(64, bold=True)
+        lines = []
+        curr_line = ''
+        for w in words:
+            test_line = f'{curr_line} {w}'.strip()
+            if f_title.getbbox(test_line)[2] - f_title.getbbox(test_line)[0] <= max_text_w:
+                curr_line = test_line
+            else:
+                if curr_line:
+                    lines.append(curr_line)
+                curr_line = w
+        if curr_line:
+            lines.append(curr_line)
 
-    font_slowed = get_font(36, bold=True)
-    draw.text((left_x, curr_y + 16), "( slowed + reverb )", fill='#475569', font=font_slowed)
+    line_h = int(f_title.size * 1.15)
+    for l in lines[:2]:
+        draw.text((left_x + 3, title_y + 3), l, fill='#000000', font=f_title)
+        draw.text((left_x, title_y), l, fill='#ffffff', font=f_title)
+        title_y += line_h
 
-    font_artist = get_font(26, bold=False)
+    # SLOWED + REVERB Badge (Vibrant Amber / Gold)
+    badge_y = title_y + 15
+    f_badge = get_font(44, bold=True)
+    badge_text = '( SLOWED + REVERB )'
+    draw.text((left_x + 2, badge_y + 2), badge_text, fill='#000000', font=f_badge)
+    draw.text((left_x, badge_y), badge_text, fill='#fbbf24', font=f_badge)
+
+    # Artist Name
+    artist_y = badge_y + 60
+    f_artist = get_font(30, bold=False)
     clean_artist = artist
-    while font_artist.getbbox(clean_artist)[2] - font_artist.getbbox(clean_artist)[0] > max_w and len(clean_artist) > 10:
-        clean_artist = clean_artist[:-4] + "..."
-    draw.text((left_x, curr_y + 72), clean_artist, fill='#64748b', font=font_artist)
+    while f_artist.getbbox(clean_artist)[2] - f_artist.getbbox(clean_artist)[0] > max_text_w and len(clean_artist) > 10:
+        clean_artist = clean_artist[:-4] + '...'
+    draw.text((left_x, artist_y), clean_artist, fill='#cbd5e1', font=f_artist)
 
     # Watermark
-    font_sub = get_font(22, bold=False)
-    draw.text((left_x, H - 130), f"@{CHANNEL_NAME} • 1080P FULL HD • 432HZ", fill='#94a3b8', font=font_sub)
+    f_wm = get_font(24, bold=False)
+    draw.text((left_x, H - 90), f"@{CHANNEL_NAME} • AESTHETIC RETUNED EDIT", fill='#64748b', font=f_wm)
 
     bg.save(output_thumb, quality=95)
     return output_thumb
