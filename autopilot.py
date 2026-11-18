@@ -61,7 +61,8 @@ def get_ytdlp_base_cmd(for_search=False):
     base = ['yt-dlp']
     if shutil.which('deno'):
         base.extend(['--remote-components', 'ejs:github'])
-    arg = 'youtube:player_client=android;player_skip=webpage,configs' if for_search else 'youtube:player_client=android;player_skip=webpage,configs,initial_data'
+    # visionos & android clients bypass datacenter bot checks reliably
+    arg = 'youtube:player_client=visionos,android;player_skip=webpage,configs' if for_search else 'youtube:player_client=visionos,android;player_skip=webpage,configs,initial_data'
     base.extend(['--extractor-args', arg])
     return base
 
@@ -342,14 +343,16 @@ def download_audio_and_cover(video_id, out_prefix):
     thumb_template = f"{out_prefix}.%(ext)s"
 
     strategies = [
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=visionos'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=ios,tv'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data'],
         ['yt-dlp', '--remote-components', 'ejs:github', '--extractor-args', 'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=tv_embedded,web_embedded'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=web_creator'],
-        ['yt-dlp', '--extractor-args', 'youtube:player_client=ios,tv'],
-        ['yt-dlp', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=mweb,android']
     ]
     if os.path.exists('cookies.txt'):
+        strategies.insert(0, ['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=visionos'])
         strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--remote-components', 'ejs:github'])
         strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=web,mweb'])
 
@@ -733,11 +736,12 @@ def main():
     pool_size = max(max_count * 4, 8)
     candidates = search_trending_songs(max_count=pool_size)
     if not candidates:
-        print("No new candidate songs found.")
-        return
+        print("[ERROR] No new candidate songs found.")
+        sys.exit(1)
 
     history = load_history()
     uploaded_count = 0
+    quota_hit = False
 
     for s in candidates:
         if uploaded_count >= max_count:
@@ -751,14 +755,22 @@ def main():
                 print("Waiting 15 seconds before next video...")
                 time.sleep(15)
         except Exception as e:
+            err_str = str(e)
+            if "uploadLimitExceeded" in err_str:
+                print(f"\n[QUOTA] YouTube 24h upload limit reached: {e}")
+                quota_hit = True
+                break
             print(f"\n[WARNING] Could not process {s.get('title')}: {e}")
             print("--> Moving immediately to next candidate song in queue...\n")
             continue
 
     if uploaded_count > 0:
         print(f"\nSUCCESS: {uploaded_count} LO-FI VIDEO(S) PROCESSED & UPLOADED!")
+    elif quota_hit:
+        print("\nNotice: Daily upload quota limit reached. Job finished safely, will resume next scheduled slot.")
     else:
-        print("\nFailed to upload videos in this run.")
+        print("\n[FATAL] Failed to upload any videos in this run.")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
