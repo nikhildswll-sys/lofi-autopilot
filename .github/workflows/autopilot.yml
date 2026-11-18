@@ -1,13 +1,10 @@
 name: YouTube Lo-Fi Autopilot
 
 on:
-  schedule:
-    # Hourly sentinel: triggers every hour, auto-uploads every 2 hours reliably (12 videos/day)
-    - cron: '15 * * * *'
-  workflow_dispatch: # Allows manual 1-click trigger anytime from GitHub Actions tab
+  workflow_dispatch: # Controlled 100% by external cron-job.org or manual 1-click trigger
     inputs:
       force:
-        description: 'Force immediate upload (ignore cadence check)'
+        description: 'Force immediate upload'
         required: false
         type: boolean
         default: true
@@ -79,11 +76,7 @@ jobs:
 
       - name: Run Autopilot Bot (Fresh Release Radar)
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" != "false" ]; then
-            python autopilot.py --count 1 --force
-          else
-            python autopilot.py --count 1
-          fi
+          python autopilot.py --count 1 --force
 
       - name: Clean sensitive credentials before finish
         if: always()
