@@ -20,6 +20,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup Cloudflare WARP Client (Bypass Datacenter IP Bot Checks)
+        continue-on-error: true
+        timeout-minutes: 3
+        uses: fscarmen/warp-on-actions@v1.4
+        with:
+          stack: ipv4
+          mode: client
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
