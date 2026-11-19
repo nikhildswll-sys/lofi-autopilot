@@ -27,7 +27,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TOKEN_FILE = os.path.join(BASE_DIR, 'token.json')
 HISTORY_FILE = os.path.join(BASE_DIR, 'history.json')
 WORK_DIR = os.path.join(BASE_DIR, 'workspace')
-CHANNEL_NAME = 'nikhildswl'
+CHANNEL_NAME = 'nikhildswll'
 
 os.makedirs(WORK_DIR, exist_ok=True)
 
@@ -281,8 +281,8 @@ def search_trending_songs(max_count=4):
                         'category': cat['name']
                     })
                     done_ids.add(vid_id)
-                    if norm_cand_title:
-                        done_titles.add(norm_cand_title)
+                    if raw_title_clean:
+                        done_titles.add(raw_title_clean)
                     print(f" -> Selected [{cat['name']}]: {raw_title[:60]} ({uploader}) [{int(duration)}s] [views: {view_count}]")
                     found_in_pass = True
                     break
@@ -769,9 +769,12 @@ def main():
     if uploaded_count > 0:
         print(f"\nSUCCESS: {uploaded_count} LO-FI VIDEO(S) PROCESSED & UPLOADED!")
     elif quota_hit:
-        print("\nNotice: Daily upload quota limit reached. Job finished safely, will resume next scheduled slot.")
+        print("\n[FATAL ERROR] YouTube 24-hour daily upload limit reached (uploadLimitExceeded)!")
+        print("YouTube enforces a 24-hour rolling cooldown on new/unverified channels.")
+        print("Failing run with exit code 1 so GitHub Actions correctly shows red (NOT false green).")
+        sys.exit(1)
     else:
-        print("\n[FATAL] Failed to upload any videos in this run.")
+        print("\n[FATAL ERROR] Failed to upload any videos in this run. Failing job loudly.")
         sys.exit(1)
 
 if __name__ == '__main__':
