@@ -61,8 +61,8 @@ def get_ytdlp_base_cmd(for_search=False):
     base = ['yt-dlp']
     if shutil.which('deno'):
         base.extend(['--remote-components', 'ejs:github'])
-    # visionos & android clients bypass datacenter bot checks reliably
-    arg = 'youtube:player_client=visionos,android;player_skip=webpage,configs' if for_search else 'youtube:player_client=visionos,android;player_skip=webpage,configs,initial_data'
+    # android & visionos clients with webpage,configs skip bypass datacenter bot checks reliably
+    arg = 'youtube:player_client=android,visionos;player_skip=webpage,configs'
     base.extend(['--extractor-args', arg])
     return base
 
@@ -343,16 +343,16 @@ def download_audio_and_cover(video_id, out_prefix):
     thumb_template = f"{out_prefix}.%(ext)s"
 
     strategies = [
-        ['yt-dlp', '--extractor-args', 'youtube:player_client=visionos'],
-        ['yt-dlp', '--extractor-args', 'youtube:player_client=ios,tv'],
-        ['yt-dlp', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs,initial_data'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=visionos;player_skip=webpage,configs'],
         ['yt-dlp', '--remote-components', 'ejs:github', '--extractor-args', 'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=tv_embedded,web_embedded'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=ios,tv'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=web_creator'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=mweb,android']
     ]
     if os.path.exists('cookies.txt'):
-        strategies.insert(0, ['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=visionos'])
+        strategies.insert(0, ['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs'])
         strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--remote-components', 'ejs:github'])
         strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=web,mweb'])
 
