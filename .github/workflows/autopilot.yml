@@ -1,9 +1,7 @@
 name: YouTube Lo-Fi Autopilot
 
 on:
-  schedule:
-    - cron: '0 */6 * * *' # Runs automatically every 6 hours without needing external cron or PAT
-  workflow_dispatch: # Allows manual 1-click trigger anytime from GitHub Actions tab
+  workflow_dispatch: # Controlled 100% by external cron-job.org or manual 1-click trigger
     inputs:
       force:
         description: 'Force immediate upload'
