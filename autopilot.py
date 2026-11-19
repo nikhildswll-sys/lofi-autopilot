@@ -352,7 +352,7 @@ def download_audio_and_cover(video_id, out_prefix):
         ['yt-dlp', '--extractor-args', 'youtube:player_client=mweb,android']
     ]
     if os.path.exists('cookies.txt'):
-        strategies.insert(0, ['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs'])
+        strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs'])
         strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--remote-components', 'ejs:github'])
         strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=web,mweb'])
 
@@ -361,6 +361,8 @@ def download_audio_and_cover(video_id, out_prefix):
     for base in strategies:
         cmd = [
             *base,
+            '-f', 'ba/b',
+            '--no-playlist',
             '--extract-audio',
             '--audio-format', 'mp3',
             '--audio-quality', '0',
