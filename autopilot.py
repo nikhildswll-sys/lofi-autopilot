@@ -318,25 +318,39 @@ def clean_song_info(raw_title, uploader):
     import re
     # 1. Take everything before the first '(' or '['
     part0 = raw_title.split('(')[0].split('[')[0].strip()
+    clean_uploader = uploader.replace(' - Topic', '').replace('VEVO', '').strip()
 
-    # 2. Split on common separators if in part0
+    candidate_title = part0
+    detected_artist = clean_uploader or 'Artist'
+
+    # 2. Smart Artist vs Song Title Detection
     if ' | ' in part0:
-        candidate_title = part0.split(' | ')[0].strip()
+        parts = [p.strip() for p in part0.split(' | ') if p.strip()]
+        candidate_title = parts[0]
+        if len(parts) > 1 and len(parts[1]) < 35:
+            detected_artist = parts[1]
     elif ' - ' in part0:
-        candidate_title = part0.split(' - ')[0].strip()
+        left, right = [p.strip() for p in part0.split(' - ', 1)]
+        if clean_uploader and (clean_uploader.lower() in left.lower() or left.lower() in clean_uploader.lower()):
+            candidate_title = right
+            detected_artist = left
+        elif clean_uploader and (clean_uploader.lower() in right.lower() or right.lower() in clean_uploader.lower()):
+            candidate_title = left
+            detected_artist = right
+        else:
+            candidate_title = right
+            detected_artist = left
     elif ' : ' in part0:
         candidate_title = part0.split(' : ')[0].strip()
     elif ':' in part0:
         candidate_title = part0.split(':')[0].strip()
-    else:
-        candidate_title = part0
 
-    # 3. Clean out stray junk words
-    candidate_title = re.sub(r'\b(Official|Music|Full|Lyrical|Lyric|Audio|Video|Song|HD)\b', '', candidate_title, flags=re.IGNORECASE).strip()
+    # 3. Clean out stray junk words & featuring phrases from title
+    candidate_title = re.sub(r'\b(with|feat\.?|ft\.?)\s+.*', '', candidate_title, flags=re.IGNORECASE).strip()
+    candidate_title = re.sub(r'\b(Official|Music|Full|Lyrical|Lyric|Audio|Video|Song|HD|Visualiser|Visualizer)\b', '', candidate_title, flags=re.IGNORECASE).strip()
     candidate_title = re.sub(r'^[\s\-_|:,]+|[\s\-_|:,]+$', '', candidate_title).strip()
 
     title = candidate_title or "Hit Track"
-    clean_uploader = uploader.replace(' - Topic', '').replace('VEVO', '').strip()
 
     # Collect all credited artists, cast, composers from raw title
     parts = [p.strip() for p in raw_title.split(' | ') if p.strip()]
@@ -350,8 +364,8 @@ def clean_song_info(raw_title, uploader):
         artist_display = ", ".join(credited_names[:3])
         all_credits = ", ".join(credited_names)
     else:
-        artist_display = clean_uploader or "Artist"
-        all_credits = clean_uploader or "Original Creators"
+        artist_display = detected_artist
+        all_credits = detected_artist
 
     title = re.sub(r'[\(\[\{\)\]\}]', '', title).strip()
     return title or "Hit Track", artist_display, all_credits, clean_uploader
