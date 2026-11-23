@@ -519,15 +519,6 @@ def generate_thumbnail(cover_path, title, artist, output_thumb):
     line_spacing = int(title_sz * 1.15)
 
     start_y = (H - card_size) // 2 + (85 if len(lines) == 1 else 45)
-    
-    # High-CTR Aesthetic Mood Pill Badge (Stops the scroll on mobile)
-    badge_w = 460
-    badge_h = 52
-    badge_y = max(start_y - 75, 120)
-    draw.rounded_rectangle([left_x, badge_y, left_x + badge_w, badge_y + badge_h], radius=26, fill='#0f172a')
-    font_badge = get_font(20, bold=True)
-    draw.text((left_x + 24, badge_y + 14), "🎧  432Hz HEALING  •  LATE NIGHT VIBES", fill='#f8fafc', font=font_badge)
-
     curr_y = start_y
     for line in lines:
         draw.text((left_x, curr_y), line, fill='#0f172a', font=font_title)
