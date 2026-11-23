@@ -370,6 +370,101 @@ def clean_song_info(raw_title, uploader):
     title = re.sub(r'[\(\[\{\)\]\}]', '', title).strip()
     return title or "Hit Track", artist_display, all_credits, clean_uploader
 
+def extract_smart_hero_frame(v_url, clean_frame_path):
+    """
+    Intelligently samples multiple timestamps across the music video stream.
+    Uses AI / Computer Vision (Face detection, contrast, sharpness, dynamic range)
+    to automatically select the best cinematic hero frame (e.g. artist looking at camera,
+    well-lit stage, iconic scene), strictly avoiding pitch-black frames, backs of heads,
+    random objects, or blurry transition cuts.
+    """
+    timestamps = ['00:00:20', '00:00:40', '00:01:05', '00:01:30', '00:01:55', '00:02:20']
+    candidates = []
+
+    has_cv2 = False
+    try:
+        import cv2
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        has_cv2 = True
+    except Exception:
+        has_cv2 = False
+
+    for i, ts in enumerate(timestamps):
+        tmp_frame = f"{clean_frame_path}_cand_{i}.jpg"
+        cmd = ['ffmpeg', '-y', '-ss', ts, '-i', v_url, '-vframes', '1', '-q:v', '2', tmp_frame]
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=15)
+        except Exception:
+            continue
+
+        if not os.path.exists(tmp_frame) or os.path.getsize(tmp_frame) < 8000:
+            if os.path.exists(tmp_frame):
+                try: os.remove(tmp_frame)
+                except Exception: pass
+            continue
+
+        try:
+            if has_cv2:
+                import numpy as np
+                img = cv2.imread(tmp_frame)
+                if img is None:
+                    continue
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                mean_val = float(np.mean(gray))
+                if mean_val < 32 or mean_val > 225:
+                    os.remove(tmp_frame)
+                    continue
+
+                contrast = float(np.std(gray))
+                sharpness = min(float(cv2.Laplacian(gray, cv2.CV_64F).var()), 500.0)
+                brightness_score = 100.0 - abs(mean_val - 110.0)
+
+                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(60, 60))
+                face_score = 0.0
+                if len(faces) > 0:
+                    face_score = 300.0
+                    for (x, y, w, h) in faces:
+                        if w > 90 and h > 90:
+                            face_score += 150.0
+
+                score = face_score + (contrast * 1.5) + (sharpness * 0.4) + brightness_score
+                candidates.append((score, tmp_frame))
+            else:
+                with Image.open(tmp_frame) as im:
+                    gray = im.convert('L')
+                    stat = ImageStat.Stat(gray)
+                    mean_val = stat.mean[0]
+                    if mean_val < 32 or mean_val > 225:
+                        os.remove(tmp_frame)
+                        continue
+                    std_dev = stat.stddev[0]
+                    brightness_score = 100.0 - abs(mean_val - 110.0)
+                    score = (std_dev * 2.0) + brightness_score
+                    candidates.append((score, tmp_frame))
+        except Exception as e:
+            if os.path.exists(tmp_frame):
+                try: os.remove(tmp_frame)
+                except Exception: pass
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    best_score, best_frame = candidates[0]
+    print(f"Smart Hero Frame selected with quality score: {best_score:.1f}")
+
+    if os.path.exists(clean_frame_path):
+        try: os.remove(clean_frame_path)
+        except Exception: pass
+    os.rename(best_frame, clean_frame_path)
+
+    for _, path in candidates[1:]:
+        if os.path.exists(path):
+            try: os.remove(path)
+            except Exception: pass
+
+    return clean_frame_path
+
 def download_audio_and_cover(video_id, out_prefix):
     url = f"https://www.youtube.com/watch?v={video_id}"
     audio_path = f"{out_prefix}.mp3"
@@ -424,12 +519,10 @@ def download_audio_and_cover(video_id, out_prefix):
         res = subprocess.run(url_cmd, capture_output=True, text=True, timeout=25)
         v_url = res.stdout.strip().split('\n')[0]
         if v_url and v_url.startswith('http'):
-            # Grab frame at 00:00:50
-            cmd_frame = ['ffmpeg', '-y', '-ss', '00:00:50', '-i', v_url, '-vframes', '1', '-q:v', '2', clean_frame_path]
-            subprocess.run(cmd_frame, capture_output=True, timeout=25)
-            if os.path.exists(clean_frame_path) and os.path.getsize(clean_frame_path) > 10000:
-                print("Extracted pristine clean video frame directly from video stream!")
-                return audio_path, clean_frame_path
+            hero_frame = extract_smart_hero_frame(v_url, clean_frame_path)
+            if hero_frame and os.path.exists(hero_frame) and os.path.getsize(hero_frame) > 10000:
+                print("Extracted pristine AI-curated hero frame directly from video stream!")
+                return audio_path, hero_frame
     except Exception as e:
         print(f"Clean stream frame grab fallback: {e}")
 
