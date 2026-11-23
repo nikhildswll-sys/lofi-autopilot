@@ -71,24 +71,65 @@ def search_trending_songs(max_count=4):
     done_ids = set(item.get('id') for item in history if isinstance(item, dict))
     done_titles = set(re.sub(r'[^a-z0-9]', '', (item.get('title') or '').lower()) for item in history if isinstance(item, dict) and item.get('title'))
 
-    # All defined categories in standard rotation order
+    # All defined categories in standard rotation order with Viral Search-Magnets
     all_categories = [
+        {
+            'name': 'Aesthetic Indie & Viral Lo-Fi',
+            'queries': [
+                'anuv jain husn official video',
+                'talwiinder dhundhala official video',
+                'aur tu hai kahan official video',
+                'anuv jain baarishein official video',
+                'abdul hannan bikhra official video',
+                'talwiinder gallan 4 official video',
+                'abdul hannan iraaday official video',
+                'kaifi khalil kahani suno 2.0 official video',
+                'anuv jain alag aasmaan official video',
+                'talwiinder nasha official video',
+                'hassan roshaan sukoon official video',
+                'prateek kuhad kasoor official video',
+                'mitraz akhiyaan official video',
+                'anuv jain jo tum mere ho official video',
+                'choo lo the local train official video'
+            ]
+        },
         {
             'name': 'Punjabi & Desi Hip Hop',
             'queries': [
-                'trending punjabi songs official music video',
-                'latest punjabi hits official video',
-                'trending desi hip hop official music video',
-                'punjabi top hits official music video',
-                'karan aujla official music video',
-                'diljit dosanjh official music video',
-                'sidhu moose wala official music video',
-                'shubh official music video',
-                'ap dhillon official music video',
-                'dhanda nyoliwala official video',
-                'divine hip hop official video',
-                'seedhe maut official music video',
-                'king hip hop official music video'
+                'karan aujla winning speech official video',
+                'shubh cheques official music video',
+                'ap dhillon with you official music video',
+                'karan aujla softly official music video',
+                'diljit dosanjh lover official video',
+                'shubh baller official video',
+                'ap dhillon excuses official music video',
+                'karan aujla tauba tauba official video',
+                'shubh her official music video',
+                'diljit dosanjh born to shine official video',
+                'ap dhillon summer high official video',
+                'karan aujla admirin you official video',
+                'shubh king shit official music video',
+                'sidhu moose wala 295 official video',
+                'seedhe maut namastute official video'
+            ]
+        },
+        {
+            'name': 'Hindi (2000s-2020s Hits, No 90s)',
+            'queries': [
+                'arijit singh o bedardeya official video',
+                'kesariya arijit singh official video',
+                'apna bana le arijit singh official video',
+                'tum ho mohit chauhan rockstar official video',
+                'tum se hi jab we met official video mohit chauhan',
+                'labon ko kk bhool bhulaiyaa official video',
+                'zara sa emraan hashmi jannat official video',
+                'dil ibadat emraan hashmi tum mile official video',
+                'hale dil murder 2 emraan hashmi official video',
+                'pee loon once upon a time in mumbaai official video',
+                'tu hi meri shab hai gangster emraan hashmi',
+                'channa mereya arijit singh official video',
+                'agar tum saath ho arijit singh alka yagnik',
+                'phir le aya dil barfi arijit singh'
             ]
         },
         {
@@ -96,7 +137,6 @@ def search_trending_songs(max_count=4):
             'queries': [
                 'trending haryanvi songs official music video',
                 'latest haryanvi hits official video',
-                'haryanvi hit songs official video',
                 'dhanda nyoliwala official video',
                 'masoom sharma official video',
                 'gulzaar chhaniwala official video',
@@ -104,27 +144,6 @@ def search_trending_songs(max_count=4):
                 'renuka panwar official video',
                 'bintu pabra official video',
                 'ajay hooda official video'
-            ]
-        },
-        {
-            'name': 'Hindi (2000s-2020s Hits, No 90s)',
-            'queries': [
-                'trending hindi songs official music video',
-                'latest bollywood songs official music video',
-                'latest hindi songs official music video tseries',
-                'arijit singh hit official music video',
-                'atif aslam hit official music video',
-                'pritam hit songs official video',
-                'vishal mishra official music video',
-                'darshan raval official music video',
-                'emraan hashmi zara sa official video',
-                'emraan hashmi dil ibadat official video',
-                'emraan hashmi hale dil official video',
-                'emraan hashmi pee loon official video',
-                'emraan hashmi tu hi meri shab hai official video',
-                'emraan hashmi jannat official video',
-                'kk romantic hit songs official video',
-                'mohit chauhan hit songs official video'
             ]
         },
         {
@@ -500,6 +519,15 @@ def generate_thumbnail(cover_path, title, artist, output_thumb):
     line_spacing = int(title_sz * 1.15)
 
     start_y = (H - card_size) // 2 + (85 if len(lines) == 1 else 45)
+    
+    # High-CTR Aesthetic Mood Pill Badge (Stops the scroll on mobile)
+    badge_w = 460
+    badge_h = 52
+    badge_y = max(start_y - 75, 120)
+    draw.rounded_rectangle([left_x, badge_y, left_x + badge_w, badge_y + badge_h], radius=26, fill='#0f172a')
+    font_badge = get_font(20, bold=True)
+    draw.text((left_x + 24, badge_y + 14), "🎧  432Hz HEALING  •  LATE NIGHT VIBES", fill='#f8fafc', font=font_badge)
+
     curr_y = start_y
     for line in lines:
         draw.text((left_x, curr_y), line, fill='#0f172a', font=font_title)
@@ -670,10 +698,26 @@ def process_one_song(song_item):
 
     # 5. Metadata
     yt_title = f"{title.upper()} - {artist} (Slowed + Reverb) | @{CHANNEL_NAME}"
+    clean_artist_tag = re.sub(r'[^a-zA-Z0-9 ]', '', artist).strip()
+    clean_title_tag = re.sub(r'[^a-zA-Z0-9 ]', '', title).strip()
+
     yt_desc = f"""🎧 {title} — {artist} (Slowed + Reverb)
-✨ Retuned to 432Hz | Aesthetic White Minimalist Edit | 1080p Full HD
+✨ Retuned to 432Hz Healing Frequency | Aesthetic White Minimalist Edit | 1080p Full HD
 
 Put on your headphones, close your eyes, and feel the late-night nostalgia. 🌙🖤
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✨ OFFICIAL 24/7 CURATED PLAYLISTS:
+🌙 Bollywood & Indie Lo-Fi: https://www.youtube.com/playlist?list={PLAYLIST_IDS['hindi']}
+🚗 Midnight Drive Punjabi: https://www.youtube.com/playlist?list={PLAYLIST_IDS['punjabi']}
+🔥 Haryanvi Chill Vibes: https://www.youtube.com/playlist?list={PLAYLIST_IDS['haryanvi']}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⏳ MOOD CHAPTERS:
+0:00 — Late Night Intro (432Hz Resample)
+0:15 — First Chorus & Cathedral Reverb
+1:25 — Deep Warm Bass Drop & Vocal Presence
+2:50 — Nostalgia Fade & Outro
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📌 TRACK & ALL CREATIVE CREDITS:
@@ -697,9 +741,30 @@ If any copyright holder, music label, or artist would like this edit removed or 
 🤍 SUPPORT THE VIBE:
 If you loved the sound, please Drop a Like 👍, Comment your favorite lyric, and Subscribe to @{CHANNEL_NAME} for daily aesthetic slowed + reverb drops!
 
-#SlowedAndReverb #LofiVibes #{title.replace(' ', '')} #{CHANNEL_NAME} #NightDrive #432Hz #IndianLofi #PartyHits
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 RELATED SEARCHES & VIBES:
+{title} slowed reverb, {title} slowed and reverb, {title} lofi, {title} 432hz, {artist} slowed reverb, {artist} lofi songs, indian lofi songs, late night drive slowed, hindi lofi study chill, aesthetic slowed hindi songs, 432hz healing frequency lofi, lofi hip hop india, relaxing slowed hindi.
+
+#SlowedAndReverb #LofiVibes #{clean_title_tag.replace(' ', '')} #{clean_artist_tag.replace(' ', '')} #{CHANNEL_NAME} #NightDrive #432Hz #IndianLofi #PartyHits
 """
-    yt_tags = [title, artist, 'slowed and reverb', 'slowed reverb', 'lofi', CHANNEL_NAME, 'aesthetic audio', 'indian lofi', '432hz', label]
+    yt_tags = [
+        clean_title_tag,
+        f"{clean_title_tag} slowed",
+        f"{clean_title_tag} slowed reverb",
+        f"{clean_title_tag} lofi",
+        f"{clean_title_tag} 432hz",
+        clean_artist_tag,
+        f"{clean_artist_tag} slowed",
+        'slowed and reverb',
+        'slowed reverb',
+        'lofi',
+        CHANNEL_NAME,
+        'aesthetic audio',
+        'indian lofi',
+        'late night drive',
+        '432hz',
+        label
+    ][:15]
 
     # 6. Upload
     uploaded_id = upload_to_youtube(video_path, thumb_path, yt_title, yt_desc, yt_tags)
