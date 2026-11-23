@@ -417,7 +417,23 @@ def download_audio_and_cover(video_id, out_prefix):
     if not download_success:
         raise last_err or Exception("All download strategies failed.")
 
-    # Find downloaded thumbnail
+    # Try extracting pristine clean 1080p frame directly from video stream (Zero poster text/logos)
+    clean_frame_path = f"{out_prefix}_clean_frame.jpg"
+    try:
+        url_cmd = ['yt-dlp', '-g', '-f', 'bestvideo[height<=1080]', url]
+        res = subprocess.run(url_cmd, capture_output=True, text=True, timeout=25)
+        v_url = res.stdout.strip().split('\n')[0]
+        if v_url and v_url.startswith('http'):
+            # Grab frame at 00:00:50
+            cmd_frame = ['ffmpeg', '-y', '-ss', '00:00:50', '-i', v_url, '-vframes', '1', '-q:v', '2', clean_frame_path]
+            subprocess.run(cmd_frame, capture_output=True, timeout=25)
+            if os.path.exists(clean_frame_path) and os.path.getsize(clean_frame_path) > 10000:
+                print("Extracted pristine clean video frame directly from video stream!")
+                return audio_path, clean_frame_path
+    except Exception as e:
+        print(f"Clean stream frame grab fallback: {e}")
+
+    # Fallback to downloaded thumbnail if stream frame grab failed
     thumb_candidates = glob.glob(f"{out_prefix}*.jpg") + glob.glob(f"{out_prefix}*.webp") + glob.glob(f"{out_prefix}*.png")
     cover_path = thumb_candidates[0] if thumb_candidates else None
     return audio_path, cover_path
@@ -479,77 +495,101 @@ def layout_title(title_text, max_w):
     return textwrap.wrap(title_text, width=16)[:2], font, 46
 
 def generate_thumbnail(cover_path, title, artist, output_thumb):
+    """
+    Renders 1080p Full-Bleed Cinematic Aesthetic Thumbnail:
+    - Pristine full-bleed 16:9 cinematic background with rich contrast
+    - Cinematic dark vignette & gradient for optimal text separation
+    - Large stylized white chalk/brush title (CaveatBrush) with multi-pass soft drop shadow
+    - Clean uppercase subtitle [ SLOWED + REVERB ]
+    - Subtle aesthetic @nikhildswll watermark in top-right
+    """
     W, H = 1920, 1080
-    bg = Image.new('RGB', (W, H), '#f7f6f0')
+    font_dir = os.path.join(BASE_DIR, 'fonts')
 
-    # Ambient cover blur background
+    font_brush_path = os.path.join(font_dir, 'CaveatBrush-Regular.ttf')
+    font_sans_path = os.path.join(font_dir, 'BebasNeue.ttf')
+
+    font_title = ImageFont.truetype(font_brush_path, 170) if os.path.exists(font_brush_path) else get_font(130, bold=True)
+    font_sub = ImageFont.truetype(font_sans_path, 54) if os.path.exists(font_sans_path) else get_font(48, bold=True)
+    font_watermark = ImageFont.truetype(font_sans_path, 38) if os.path.exists(font_sans_path) else get_font(32, bold=False)
+
     if cover_path and os.path.exists(cover_path):
         try:
-            cov = Image.open(cover_path).convert('RGB')
-            cov_blur = cov.resize((int(W * 1.3), int(H * 1.3))).filter(ImageFilter.GaussianBlur(radius=55))
-            bg.paste(cov_blur, (-100, -100))
-            # Overlay ivory cream wash
-            overlay = Image.new('RGBA', (W, H), (252, 251, 247, 230))
-            bg.paste(overlay, (0, 0), overlay)
-        except Exception as e:
-            print(f"Cover blur error: {e}")
+            im = Image.open(cover_path).convert('RGB')
+            im_ratio = im.width / im.height
+            target_ratio = W / H
+            if im_ratio > target_ratio:
+                new_h = H
+                new_w = int(H * im_ratio)
+            else:
+                new_w = W
+                new_h = int(W / im_ratio)
+            im_resized = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            left = (new_w - W) // 2
+            top = (new_h - H) // 2
+            bg = im_resized.crop((left, top, left + W, top + H))
+        except Exception:
+            bg = Image.new('RGB', (W, H), '#18181b')
+    else:
+        bg = Image.new('RGB', (W, H), '#18181b')
+
+    # Color Grade & Contrast Enhancement
+    bg = ImageEnhance.Contrast(bg).enhance(1.18)
+    bg = ImageEnhance.Color(bg).enhance(1.08)
+
+    # Cinema Vignette & dark gradient overlay for text readability
+    vignette = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    v_draw = ImageDraw.Draw(vignette)
+    for y in range(H):
+        alpha = int(55 + 95 * (y / H))
+        v_draw.line([(0, y), (W, y)], fill=(6, 6, 10, alpha))
+    bg.paste(vignette, (0, 0), vignette)
+
+    clean_title = title.upper()
+    sub_text = '[ SLOWED + REVERB ]'
+
+    bbox_t = font_title.getbbox(clean_title)
+    tw = bbox_t[2] - bbox_t[0]
+    th = bbox_t[3] - bbox_t[1]
+
+    # If title is very wide, scale down font
+    if tw > W - 200:
+        scale_factor = (W - 250) / tw
+        new_size = int(170 * scale_factor)
+        font_title = ImageFont.truetype(font_brush_path, max(new_size, 85)) if os.path.exists(font_brush_path) else get_font(max(new_size, 85), bold=True)
+        bbox_t = font_title.getbbox(clean_title)
+        tw = bbox_t[2] - bbox_t[0]
+        th = bbox_t[3] - bbox_t[1]
+
+    bbox_s = font_sub.getbbox(sub_text)
+    sw = bbox_s[2] - bbox_s[0]
+    sh = bbox_s[3] - bbox_s[1]
+
+    tx = (W - tw) // 2
+    ty = (H - th - sh - 30) // 2 + 30
+
+    sx = (W - sw) // 2
+    sy = ty + th + 25
+
+    # Multi-pass soft shadow for depth
+    shadow_img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    s_draw = ImageDraw.Draw(shadow_img)
+    for dx, dy in [(-3,-3), (3,-3), (-3,3), (3,3), (0, 5), (0, 8), (0, 11)]:
+        s_draw.text((tx + dx, ty + dy), clean_title, fill=(0, 0, 0, 240), font=font_title)
+        s_draw.text((sx + dx, sy + dy), sub_text, fill=(0, 0, 0, 240), font=font_sub)
+
+    shadow_blur = shadow_img.filter(ImageFilter.GaussianBlur(radius=8))
+    bg.paste(shadow_blur, (0, 0), shadow_blur)
 
     draw = ImageDraw.Draw(bg)
+    draw.text((tx, ty), clean_title, fill='#ffffff', font=font_title)
+    draw.text((sx, sy), sub_text, fill='#ffffff', font=font_sub)
 
-    # 1. Right Side: Card Artwork + Vinyl Peek
-    card_size = 580
-    card_x = W - card_size - 130
-    card_y = (H - card_size) // 2
-
-    # Vinyl circle behind card
-    vinyl_x = card_x + int(card_size * 0.72)
-    vinyl_y = card_y + card_size // 2
-    vr = int(card_size * 0.46)
-    draw.ellipse([vinyl_x - vr, vinyl_y - vr, vinyl_x + vr, vinyl_y + vr], fill='#121217')
-    # Vinyl grooves
-    for r in range(70, vr - 10, 12):
-        draw.ellipse([vinyl_x - r, vinyl_y - r, vinyl_x + r, vinyl_y + r], outline='#2a2a32', width=1)
-    draw.ellipse([vinyl_x - 45, vinyl_y - 45, vinyl_x + 45, vinyl_y + 45], fill='#f5f3ec')
-    draw.ellipse([vinyl_x - 10, vinyl_y - 10, vinyl_x + 10, vinyl_y + 10], fill='#111116')
-
-    # Front Album Card
-    if cover_path and os.path.exists(cover_path):
-        try:
-            cov = Image.open(cover_path).convert('RGB').resize((card_size, card_size), Image.Resampling.LANCZOS)
-            bg.paste(cov, (card_x, card_y))
-        except Exception:
-            draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], fill='#e2e8f0')
-    else:
-        draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], fill='#e2e8f0')
-
-    # Card border
-    draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], outline='#dcdad4', width=2)
-
-    # 2. Left Side: Clean Minimalist Typography with Clearly Readable Larger Fonts
-    left_x = 130
-    max_w = card_x - left_x - 60
-
-    lines, font_title, title_sz = layout_title(title.upper(), max_w)
-    line_spacing = int(title_sz * 1.15)
-
-    start_y = (H - card_size) // 2 + (85 if len(lines) == 1 else 45)
-    curr_y = start_y
-    for line in lines:
-        draw.text((left_x, curr_y), line, fill='#0f172a', font=font_title)
-        curr_y += line_spacing
-
-    font_slowed = get_font(42, bold=True)
-    draw.text((left_x, curr_y + 18), "( slowed + reverb )", fill='#334155', font=font_slowed)
-
-    font_artist = get_font(32, bold=False)
-    clean_artist = artist
-    while font_artist.getbbox(clean_artist)[2] - font_artist.getbbox(clean_artist)[0] > max_w and len(clean_artist) > 10:
-        clean_artist = clean_artist[:-4] + "..."
-    draw.text((left_x, curr_y + 78), clean_artist, fill='#475569', font=font_artist)
-
-    # Watermark
-    font_sub = get_font(24, bold=False)
-    draw.text((left_x, H - 120), f"@{CHANNEL_NAME} • 1080P FULL HD • 432HZ", fill='#64748b', font=font_sub)
+    # Top Right Watermark
+    wm_text = f"@{CHANNEL_NAME.upper()}"
+    wm_bbox = font_watermark.getbbox(wm_text)
+    wm_w = wm_bbox[2] - wm_bbox[0]
+    draw.text((W - wm_w - 70, 60), wm_text, fill=(255, 255, 255, 185), font=font_watermark)
 
     bg.save(output_thumb, quality=95)
     return output_thumb
