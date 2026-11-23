@@ -18,7 +18,7 @@ import subprocess
 import glob
 import random
 import re
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance, ImageStat
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -496,32 +496,31 @@ def layout_title(title_text, max_w):
 
 def crop_letterbox_bars(im):
     try:
-        import numpy as np
-        arr = np.array(im)
+        gray = im.convert('L')
+        w, h = gray.size
+        box_left = int(w * 0.1)
+        box_right = int(w * 0.9)
+
         top = 0
-        for y in range(arr.shape[0]):
-            if arr[y, :, :].mean() > 8:
+        for y in range(int(h * 0.35)):
+            row = gray.crop((box_left, y, box_right, y + 1))
+            stat = ImageStat.Stat(row)
+            if stat.mean[0] > 12:
                 top = y
                 break
-        bottom = arr.shape[0]
-        for y in range(arr.shape[0]-1, -1, -1):
-            if arr[y, :, :].mean() > 8:
+
+        bottom = h
+        for y in range(h - 1, int(h * 0.65), -1):
+            row = gray.crop((box_left, y, box_right, y + 1))
+            stat = ImageStat.Stat(row)
+            if stat.mean[0] > 12:
                 bottom = y + 1
                 break
-        left = 0
-        for x in range(arr.shape[1]):
-            if arr[:, x, :].mean() > 8:
-                left = x
-                break
-        right = arr.shape[1]
-        for x in range(arr.shape[1]-1, -1, -1):
-            if arr[:, x, :].mean() > 8:
-                right = x + 1
-                break
-        if top > 0 or bottom < arr.shape[0] or left > 0 or right < arr.shape[1]:
-            return im.crop((left, top, right, bottom))
-    except Exception:
-        pass
+
+        if top > 10 or bottom < h - 10:
+            return im.crop((0, top, w, bottom))
+    except Exception as e:
+        print(f"Letterbox crop notice: {e}")
     return im
 
 def generate_thumbnail(cover_path, title, artist, output_thumb):
