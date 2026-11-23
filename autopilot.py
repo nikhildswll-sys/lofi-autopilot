@@ -599,6 +599,47 @@ def upload_to_youtube(video_path, thumbnail_path, title, description, tags):
 
     return video_id
 
+PLAYLIST_IDS = {
+    'hindi': 'PLFCTerpJfOZc',
+    'punjabi': 'PLF_jJfUZ-qto',
+    'haryanvi': 'PLL-jv2OGy6uc'
+}
+
+def add_video_to_playlist(video_id, category_name, song_title):
+    cat_lower = (category_name or '').lower()
+    title_lower = (song_title or '').lower()
+
+    if 'haryanvi' in cat_lower or any(k in title_lower for k in ['haryanvi', 'pranjal', 'dhanda', 'renuka', 'masoom', 'chahar', 'pabra', 'hooda', 'chabili', 'matak', 'darling', 'zulmi', 'kood']):
+        target_pl = PLAYLIST_IDS['haryanvi']
+        target_name = 'Haryanvi & Desi Chill'
+    elif 'punjabi' in cat_lower or any(k in title_lower for k in ['punjabi', 'shubh', 'aujla', 'diljit', 'mankirt', 'kaptaan', 'ap dhillon', 'moose wala', 'hip hop']):
+        target_pl = PLAYLIST_IDS['punjabi']
+        target_name = 'Midnight Drive Punjabi'
+    else:
+        target_pl = PLAYLIST_IDS['hindi']
+        target_name = 'Late Night Bollywood & Indie Lo-Fi'
+
+    try:
+        if not os.path.exists(TOKEN_FILE):
+            return
+        c = Credentials.from_authorized_user_file(TOKEN_FILE)
+        yt = build('youtube', 'v3', credentials=c)
+        yt.playlistItems().insert(
+            part='snippet',
+            body={
+                'snippet': {
+                    'playlistId': target_pl,
+                    'resourceId': {
+                        'kind': 'youtube#video',
+                        'videoId': video_id
+                    }
+                }
+            }
+        ).execute()
+        print(f"Auto-added to playlist: [{target_name}] ({target_pl})")
+    except Exception as e:
+        print(f"[Playlist Auto-Add] Info: {e}")
+
 def process_one_song(song_item):
     vid_id = song_item['id']
     raw_title = song_item['title']
@@ -662,6 +703,10 @@ If you loved the sound, please Drop a Like 👍, Comment your favorite lyric, an
 
     # 6. Upload
     uploaded_id = upload_to_youtube(video_path, thumb_path, yt_title, yt_desc, yt_tags)
+
+    # 7. Automatically Add to Respective Genre Playlist!
+    cat_name = song_item.get('category', 'Hindi')
+    add_video_to_playlist(uploaded_id, cat_name, title)
 
     # Cleanup temp workspace files
     for f in glob.glob(f"{prefix}*"):
