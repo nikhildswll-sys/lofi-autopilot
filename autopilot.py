@@ -494,6 +494,36 @@ def layout_title(title_text, max_w):
     font = get_font(46, bold=True)
     return textwrap.wrap(title_text, width=16)[:2], font, 46
 
+def crop_letterbox_bars(im):
+    try:
+        import numpy as np
+        arr = np.array(im)
+        top = 0
+        for y in range(arr.shape[0]):
+            if arr[y, :, :].mean() > 8:
+                top = y
+                break
+        bottom = arr.shape[0]
+        for y in range(arr.shape[0]-1, -1, -1):
+            if arr[y, :, :].mean() > 8:
+                bottom = y + 1
+                break
+        left = 0
+        for x in range(arr.shape[1]):
+            if arr[:, x, :].mean() > 8:
+                left = x
+                break
+        right = arr.shape[1]
+        for x in range(arr.shape[1]-1, -1, -1):
+            if arr[:, x, :].mean() > 8:
+                right = x + 1
+                break
+        if top > 0 or bottom < arr.shape[0] or left > 0 or right < arr.shape[1]:
+            return im.crop((left, top, right, bottom))
+    except Exception:
+        pass
+    return im
+
 def generate_thumbnail(cover_path, title, artist, output_thumb):
     """
     Renders 1080p Full-Bleed Cinematic Aesthetic Thumbnail:
@@ -515,7 +545,8 @@ def generate_thumbnail(cover_path, title, artist, output_thumb):
 
     if cover_path and os.path.exists(cover_path):
         try:
-            im = Image.open(cover_path).convert('RGB')
+            raw_im = Image.open(cover_path).convert('RGB')
+            im = crop_letterbox_bars(raw_im)
             im_ratio = im.width / im.height
             target_ratio = W / H
             if im_ratio > target_ratio:
