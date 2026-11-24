@@ -1,0 +1,37 @@
+name: Update Thumbnail and Playlist
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'trigger_thumb_update.txt'
+
+jobs:
+  update-thumb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install google-api-python-client google-auth-oauthlib google-auth-httplib2 pillow
+
+      - name: Restore Credentials
+        env:
+          CLIENT_SECRETS_JSON: ${{ secrets.CLIENT_SECRETS_JSON }}
+          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+        run: |
+          echo "$CLIENT_SECRETS_JSON" > client_secrets.json
+          echo "$TOKEN_JSON" > token.json
+
+      - name: Run Update Script
+        run: python update_thumb.py
+
+      - name: Clean sensitive credentials
+        if: always()
+        run: rm -f client_secrets.json token.json

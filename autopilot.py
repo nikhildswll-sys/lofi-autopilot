@@ -415,7 +415,8 @@ def extract_smart_hero_frame(v_url, clean_frame_path):
     well-lit stage, iconic scene), strictly avoiding pitch-black frames, backs of heads,
     random objects, or blurry transition cuts.
     """
-    timestamps = ['00:00:25', '00:00:50', '00:01:15', '00:01:40', '00:02:00', '00:02:25', '00:02:50', '00:03:15']
+    # Start timestamps after 00:00:50 to completely avoid opening title cards, credits, and logos
+    timestamps = ['00:00:55', '00:01:15', '00:01:35', '00:01:55', '00:02:15', '00:02:35', '00:02:55', '00:03:15']
     candidates = []
 
     has_cv2 = False
@@ -722,34 +723,23 @@ def generate_thumbnail(cover_path, title, artist, output_thumb):
     sw = bbox_s[2] - bbox_s[0]
     sh = bbox_s[3] - bbox_s[1]
 
-    if has_face and face_y < int(H * 0.65):
-        # Face is in upper/middle frame -> Place in lower third (Never covers face!)
-        tx = (W - tw) // 2
-        ty = int(H * 0.74)
-        sx = (W - sw) // 2
-        sy = ty + th + 18
-        grad = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-        g_draw = ImageDraw.Draw(grad)
-        start_y = int(H * 0.58)
-        for y in range(start_y, H):
-            prog = max(0.0, float(y - start_y) / float(H - start_y))
-            alpha = int(220 * (prog ** 1.3))
-            g_draw.line([(0, y), (W, y)], fill=(4, 4, 8, alpha))
-        bg_rgba = bg.convert('RGBA')
-        bg = Image.alpha_composite(bg_rgba, grad).convert('RGB')
-    else:
-        # Standard balanced layout
-        tx = (W - tw) // 2
-        ty = int(H * 0.44)
-        sx = (W - sw) // 2
-        sy = ty + th + 18
-        vignette = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-        v_draw = ImageDraw.Draw(vignette)
-        for y in range(H):
-            alpha = int(50 + 90 * (y / H))
-            v_draw.line([(0, y), (W, y)], fill=(6, 6, 10, alpha))
-        bg_rgba = bg.convert('RGBA')
-        bg = Image.alpha_composite(bg_rgba, vignette).convert('RGB')
+    # Universal Aesthetic Layout: Lower-Third placement (y = int(H * 0.73))
+    # This guarantees typography never covers actor/singer faces or central subjects,
+    # with a soft cinematic bottom shadow gradient for high contrast readability.
+    tx = (W - tw) // 2
+    ty = int(H * 0.73)
+    sx = (W - sw) // 2
+    sy = ty + th + 18
+
+    grad = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    g_draw = ImageDraw.Draw(grad)
+    start_y = int(H * 0.52)
+    for y in range(start_y, H):
+        prog = max(0.0, float(y - start_y) / float(H - start_y))
+        alpha = int(225 * (prog ** 1.25))
+        g_draw.line([(0, y), (W, y)], fill=(4, 4, 8, alpha))
+    bg_rgba = bg.convert('RGBA')
+    bg = Image.alpha_composite(bg_rgba, grad).convert('RGB')
 
     # Multi-pass soft shadow for depth
     shadow_img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
