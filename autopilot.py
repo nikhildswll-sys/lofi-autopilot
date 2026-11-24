@@ -149,7 +149,6 @@ def search_trending_songs(max_count=4):
         {
             'name': 'Iconic Bangers & Nostalgia (Famous Party & Cult Hits)',
             'queries': [
-                'daddy mummy video song bhaag johnny',
                 'subah hone na de official video desi boyz',
                 'proper patola official video diljit dosanjh',
                 'baby doll official video ragini mms 2',
@@ -206,7 +205,8 @@ def search_trending_songs(max_count=4):
         'fan made', 'fanmade', 'concept', 'unreleased', 'teaser', 'trailer',
         'status', 'shorts', 'whatsapp', 'ringtone', 'cover song', 'tribute',
         'vatsal bhoya', 'prakash jojawar', 'reaction', 'review', 'vlog',
-        'suno', 'udio', 'karaoke', 'instrumental'
+        'suno', 'udio', 'karaoke', 'instrumental',
+        'tamil', 'telugu', 'malayalam', 'kannada', 'bengali', 'marathi', 'odia', 'gujarati'
     ]
     BANNED_CHANNELS = ['vatsal bhoya', 'prakash jojawar']
 
@@ -289,6 +289,10 @@ def search_trending_songs(max_count=4):
                     if any(k in u_lower for k in ['status', 'shorts', 'reels', 'ai ', ' ai', 'fan club', 'edits']):
                         continue
 
+                    # Reject non-Hindi/Punjabi/Haryanvi scripts (Tamil, Telugu, Kannada, Malayalam, Bengali)
+                    if re.search(r'[\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F\u0980-\u09FF]', raw_title):
+                        continue
+
                     # Block low-view spam / fake AI tracks (real trending hits have >= 50k views)
                     if view_count > 0 and view_count < 50000:
                         continue
@@ -301,8 +305,8 @@ def search_trending_songs(max_count=4):
                         'category': cat['name']
                     })
                     done_ids.add(vid_id)
-                    if raw_title_clean:
-                        done_titles.add(raw_title_clean)
+                    if cand_norm:
+                        done_titles.add(cand_norm)
                     print(f" -> Selected [{cat['name']}]: {raw_title[:60]} ({uploader}) [{int(duration)}s] [views: {view_count}]")
                     found_in_pass = True
                     break
@@ -350,13 +354,13 @@ def clean_song_info(raw_title, uploader):
 
     # Clean out stray junk words from title
     candidate_title = re.sub(r'\b(with|feat\.?|ft\.?)\s+.*', '', candidate_title, flags=re.IGNORECASE).strip()
-    candidate_title = re.sub(r'\b(Official|Music|Full|Lyrical|Lyric|Audio|Video|Song|HD|Visualiser|Visualizer)\b', '', candidate_title, flags=re.IGNORECASE).strip()
+    candidate_title = re.sub(r'\b(Official|Music|Full|Lyrical|Lyric|Audio|Video|Song|HD|8K|4K|2K|1080p|Visualiser|Visualizer)\b', '', candidate_title, flags=re.IGNORECASE).strip()
 
     # Collect credited artists from raw title, filtering out generic channel tags
     parts = [p.strip() for p in raw_title.split(' | ') if p.strip()]
     credited_names = []
     for p in parts[1:]:
-        p_clean = re.sub(r'\b(Full|Video|Song|Audio|Official|HD|Movie)\b', '', p, flags=re.IGNORECASE).strip()
+        p_clean = re.sub(r'\b(Full|Video|Song|Audio|Official|HD|8K|4K|2K|Movie)\b', '', p, flags=re.IGNORECASE).strip()
         if re.search(r'\b(New|Latest|Top|Best|Trending|Hit|Hits)\s+(Haryanvi|Punjabi|Hindi|Bhojpuri|Bollywood)?\s*(Songs|Song|Track|Music)?\s*\d{4}?\b', p_clean, re.IGNORECASE):
             continue
         if p_clean and len(p_clean) < 40 and p_clean.lower() not in clean_uploader.lower():
@@ -369,6 +373,7 @@ def clean_song_info(raw_title, uploader):
         'Anuv Jain', 'Prateek Kuhad', 'Darshan Raval', 'Sidhu Moose Wala', 'Kaka',
         'Amrit Maan', 'Jordan Sandhu', 'Mankirt Aulakh', 'King', 'MC Stan', 'Badshah',
         'Mohit Chauhan', 'KK', 'Sonu Nigam', 'Sunidhi Chauhan', 'Armaan Malik', 'Neha Kakkar',
+        'Mika Singh', 'Yo Yo Honey Singh', 'Guru Randhawa', 'Hardy Sandhu', 'Jass Manak',
         'D Naveen', 'Masoom Sharma', 'Amit Saini Rohtakiya', 'Renuka Panwar', 'Guri'
     ]
     matched_singers = [s for s in KNOWN_SINGERS if re.search(r'\b' + re.escape(s) + r'\b', raw_title, re.IGNORECASE)]
