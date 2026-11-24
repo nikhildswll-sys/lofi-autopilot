@@ -43,8 +43,17 @@ jobs:
 
       - name: Install System Dependencies (FFmpeg & Rubberband)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg librubberband-dev fonts-dejavu-core
+          for i in {1..8}; do
+            sudo killall apt-get apt unattended-upgrades 2>/dev/null || true
+            sudo rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock* 2>/dev/null || true
+            sudo dpkg --configure -a 2>/dev/null || true
+            if sudo apt-get update && sudo apt-get install -y ffmpeg librubberband-dev fonts-dejavu-core; then
+              echo "System dependencies installed successfully!"
+              break
+            fi
+            echo "Waiting for apt lock release, retry $i/8..."
+            sleep 6
+          done
 
       - name: Install Python Dependencies
         run: |
