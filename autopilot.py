@@ -316,47 +316,48 @@ def search_trending_songs(max_count=4):
 
 def clean_song_info(raw_title, uploader):
     import re
-    # 1. Take everything before the first '(' or '['
-    part0 = raw_title.split('(')[0].split('[')[0].strip()
     clean_uploader = uploader.replace(' - Topic', '').replace('VEVO', '').strip()
 
-    candidate_title = part0
-    detected_artist = clean_uploader or 'Artist'
+    candidate_title = ''
+    detected_artist = ''
 
-    # 2. Smart Artist vs Song Title Detection
-    if ' | ' in part0:
-        parts = [p.strip() for p in part0.split(' | ') if p.strip()]
-        candidate_title = parts[0]
-        if len(parts) > 1 and len(parts[1]) < 35:
-            detected_artist = parts[1]
-    elif ' - ' in part0:
-        left, right = [p.strip() for p in part0.split(' - ', 1)]
-        if clean_uploader and (clean_uploader.lower() in left.lower() or left.lower() in clean_uploader.lower()):
-            candidate_title = right
-            detected_artist = left
-        elif clean_uploader and (clean_uploader.lower() in right.lower() or right.lower() in clean_uploader.lower()):
-            candidate_title = left
-            detected_artist = right
+    # Check if artist is formatted after brackets e.g. "Song (Video) - Artist | Label"
+    post_artist_match = re.search(r'[\)\]]\s*-\s*([^|]+)', raw_title)
+    if post_artist_match:
+        candidate_title = re.split(r'[\(\[]', raw_title)[0].strip()
+        detected_artist = post_artist_match.group(1).strip()
+    else:
+        part0 = re.split(r'[\(\[]', raw_title)[0].strip()
+        if ' - ' in part0:
+            left, right = [p.strip() for p in part0.split(' - ', 1)]
+            if clean_uploader and (clean_uploader.lower() in left.lower() or left.lower() in clean_uploader.lower()):
+                candidate_title = right
+                detected_artist = left
+            elif clean_uploader and (clean_uploader.lower() in right.lower() or right.lower() in clean_uploader.lower()):
+                candidate_title = left
+                detected_artist = right
+            else:
+                candidate_title = right
+                detected_artist = left
+        elif ' | ' in part0:
+            p_list = [p.strip() for p in part0.split(' | ') if p.strip()]
+            candidate_title = p_list[0]
+            if len(p_list) > 1:
+                detected_artist = p_list[1]
         else:
-            candidate_title = right
-            detected_artist = left
-    elif ' : ' in part0:
-        candidate_title = part0.split(' : ')[0].strip()
-    elif ':' in part0:
-        candidate_title = part0.split(':')[0].strip()
+            candidate_title = part0
 
-    # 3. Clean out stray junk words & featuring phrases from title
+    # Clean out stray junk words from title
     candidate_title = re.sub(r'\b(with|feat\.?|ft\.?)\s+.*', '', candidate_title, flags=re.IGNORECASE).strip()
     candidate_title = re.sub(r'\b(Official|Music|Full|Lyrical|Lyric|Audio|Video|Song|HD|Visualiser|Visualizer)\b', '', candidate_title, flags=re.IGNORECASE).strip()
-    candidate_title = re.sub(r'^[\s\-_|:,]+|[\s\-_|:,]+$', '', candidate_title).strip()
 
-    title = candidate_title or "Hit Track"
-
-    # Collect all credited artists, cast, composers from raw title
+    # Collect credited artists from raw title, filtering out generic channel tags
     parts = [p.strip() for p in raw_title.split(' | ') if p.strip()]
     credited_names = []
     for p in parts[1:]:
         p_clean = re.sub(r'\b(Full|Video|Song|Audio|Official|HD|Movie)\b', '', p, flags=re.IGNORECASE).strip()
+        if re.search(r'\b(New|Latest|Top|Best|Trending|Hit|Hits)\s+(Haryanvi|Punjabi|Hindi|Bhojpuri|Bollywood)?\s*(Songs|Song|Track|Music)?\s*\d{4}?\b', p_clean, re.IGNORECASE):
+            continue
         if p_clean and len(p_clean) < 40 and p_clean.lower() not in clean_uploader.lower():
             credited_names.append(p_clean)
 
@@ -366,18 +367,18 @@ def clean_song_info(raw_title, uploader):
         'Diljit Dosanjh', 'B Praak', 'Shreya Ghoshal', 'Jubin Nautiyal', 'Jasleen Royal',
         'Anuv Jain', 'Prateek Kuhad', 'Darshan Raval', 'Sidhu Moose Wala', 'Kaka',
         'Amrit Maan', 'Jordan Sandhu', 'Mankirt Aulakh', 'King', 'MC Stan', 'Badshah',
-        'Mohit Chauhan', 'KK', 'Sonu Nigam', 'Sunidhi Chauhan', 'Armaan Malik', 'Neha Kakkar'
+        'Mohit Chauhan', 'KK', 'Sonu Nigam', 'Sunidhi Chauhan', 'Armaan Malik', 'Neha Kakkar',
+        'D Naveen', 'Masoom Sharma', 'Amit Saini Rohtakiya', 'Renuka Panwar', 'Guri'
     ]
     matched_singers = [s for s in KNOWN_SINGERS if re.search(r'\b' + re.escape(s) + r'\b', raw_title, re.IGNORECASE)]
 
     if matched_singers:
         artist_display = matched_singers[0]
         all_credits = ", ".join(matched_singers)
-    elif detected_artist and detected_artist.lower() not in clean_uploader.lower():
+    elif detected_artist and detected_artist.lower() not in clean_uploader.lower() and not re.search(r'\b(New|Latest|Top|Best|Trending)\b', detected_artist, re.IGNORECASE):
         artist_display = detected_artist
         all_credits = detected_artist
     elif credited_names:
-        # Extract individual names from comma-separated blocks and take at most first 2
         raw_list = []
         for block in credited_names:
             for item in block.split(','):
@@ -387,8 +388,15 @@ def clean_song_info(raw_title, uploader):
         artist_display = ", ".join(raw_list[:2]) if raw_list else credited_names[0]
         all_credits = ", ".join(credited_names)
     else:
-        artist_display = detected_artist
-        all_credits = detected_artist
+        artist_display = detected_artist or clean_uploader
+
+    # Clean singer name out of song title if it got appended
+    candidate_title = re.sub(r'\b' + re.escape(artist_display) + r'\b', '', candidate_title, flags=re.IGNORECASE).strip()
+    candidate_title = re.sub(r'^[\s\-_|:,]+|[\s\-_|:,]+$', '', candidate_title).strip()
+    candidate_title = re.sub(r'[\(\[\{\)\]\}]', '', candidate_title).strip()
+
+    title = candidate_title or "Hit Track"
+    return title, artist_display, all_credits, clean_uploader
 
     title = re.sub(r'[\(\[\{\)\]\}]', '', title).strip()
     return title or "Hit Track", artist_display, all_credits, clean_uploader
@@ -401,7 +409,7 @@ def extract_smart_hero_frame(v_url, clean_frame_path):
     well-lit stage, iconic scene), strictly avoiding pitch-black frames, backs of heads,
     random objects, or blurry transition cuts.
     """
-    timestamps = ['00:00:20', '00:00:40', '00:01:05', '00:01:30', '00:01:55', '00:02:20']
+    timestamps = ['00:00:25', '00:00:50', '00:01:15', '00:01:40', '00:02:00', '00:02:25', '00:02:50', '00:03:15']
     candidates = []
 
     has_cv2 = False
@@ -416,7 +424,7 @@ def extract_smart_hero_frame(v_url, clean_frame_path):
         tmp_frame = f"{clean_frame_path}_cand_{i}.jpg"
         cmd = ['ffmpeg', '-y', '-ss', ts, '-i', v_url, '-vframes', '1', '-q:v', '2', tmp_frame]
         try:
-            subprocess.run(cmd, capture_output=True, timeout=15)
+            subprocess.run(cmd, capture_output=True, timeout=25)
         except Exception:
             continue
 
@@ -445,10 +453,13 @@ def extract_smart_hero_frame(v_url, clean_frame_path):
                 faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(60, 60))
                 face_score = 0.0
                 if len(faces) > 0:
-                    face_score = 300.0
                     for (x, y, w, h) in faces:
-                        if w > 90 and h > 90:
-                            face_score += 150.0
+                        if w >= 110 and h >= 110:
+                            face_score = max(face_score, 450.0)
+                        elif w >= 75 and h >= 75:
+                            face_score = max(face_score, 320.0)
+                        else:
+                            face_score = max(face_score, 120.0)
 
                 score = face_score + (contrast * 1.5) + (sharpness * 0.4) + brightness_score
                 candidates.append((score, tmp_frame))
