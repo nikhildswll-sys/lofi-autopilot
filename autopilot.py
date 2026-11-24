@@ -270,9 +270,10 @@ def search_trending_songs(max_count=4):
                     if vid_id in done_ids:
                         continue
 
-                    # Clean check for duplicate title already uploaded
-                    raw_title_clean = re.sub(r'[^a-z0-9]', '', raw_title.lower())
-                    if any(t in raw_title_clean for t in done_titles if len(t) >= 6):
+                    # Strict title duplicate prevention: clean and check against already processed songs
+                    cand_title, _, _, _ = clean_song_info(raw_title, uploader)
+                    cand_norm = re.sub(r'[^a-z0-9]', '', cand_title.lower())
+                    if not cand_norm or cand_norm in done_titles:
                         continue
 
                     # Single original tracks must be 110s - 360s
