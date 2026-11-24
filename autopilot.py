@@ -360,8 +360,31 @@ def clean_song_info(raw_title, uploader):
         if p_clean and len(p_clean) < 40 and p_clean.lower() not in clean_uploader.lower():
             credited_names.append(p_clean)
 
-    if credited_names:
-        artist_display = ", ".join(credited_names[:3])
+    # Smart Singer & Artist Prioritization (Never dump 5 cast names like Ranbir, Shraddha, Pritam)
+    KNOWN_SINGERS = [
+        'Arijit Singh', 'Atif Aslam', 'Karan Aujla', 'Talwiinder', 'AP Dhillon',
+        'Diljit Dosanjh', 'B Praak', 'Shreya Ghoshal', 'Jubin Nautiyal', 'Jasleen Royal',
+        'Anuv Jain', 'Prateek Kuhad', 'Darshan Raval', 'Sidhu Moose Wala', 'Kaka',
+        'Amrit Maan', 'Jordan Sandhu', 'Mankirt Aulakh', 'King', 'MC Stan', 'Badshah',
+        'Mohit Chauhan', 'KK', 'Sonu Nigam', 'Sunidhi Chauhan', 'Armaan Malik', 'Neha Kakkar'
+    ]
+    matched_singers = [s for s in KNOWN_SINGERS if re.search(r'\b' + re.escape(s) + r'\b', raw_title, re.IGNORECASE)]
+
+    if matched_singers:
+        artist_display = matched_singers[0]
+        all_credits = ", ".join(matched_singers)
+    elif detected_artist and detected_artist.lower() not in clean_uploader.lower():
+        artist_display = detected_artist
+        all_credits = detected_artist
+    elif credited_names:
+        # Extract individual names from comma-separated blocks and take at most first 2
+        raw_list = []
+        for block in credited_names:
+            for item in block.split(','):
+                it = item.strip()
+                if it and len(it) > 2 and it not in raw_list:
+                    raw_list.append(it)
+        artist_display = ", ".join(raw_list[:2]) if raw_list else credited_names[0]
         all_credits = ", ".join(credited_names)
     else:
         artist_display = detected_artist
@@ -591,26 +614,17 @@ def crop_letterbox_bars(im):
     try:
         gray = im.convert('L')
         w, h = gray.size
-        box_left = int(w * 0.1)
-        box_right = int(w * 0.9)
-
+        # Sample two vertical columns (15% and 85%) to avoid center badges like iTunes/Dolby
         top = 0
         for y in range(int(h * 0.35)):
-            row = gray.crop((box_left, y, box_right, y + 1))
-            stat = ImageStat.Stat(row)
-            if stat.mean[0] > 12:
+            val1 = gray.getpixel((int(w * 0.15), y))
+            val2 = gray.getpixel((int(w * 0.85), y))
+            if val1 > 15 or val2 > 15:
                 top = y
                 break
 
-        bottom = h
-        for y in range(h - 1, int(h * 0.65), -1):
-            row = gray.crop((box_left, y, box_right, y + 1))
-            stat = ImageStat.Stat(row)
-            if stat.mean[0] > 12:
-                bottom = y + 1
-                break
-
-        if top > 10 or bottom < h - 10:
+        if top > 15:
+            bottom = h - top
             return im.crop((0, top, w, bottom))
     except Exception as e:
         print(f"Letterbox crop notice: {e}")
@@ -619,8 +633,9 @@ def crop_letterbox_bars(im):
 def generate_thumbnail(cover_path, title, artist, output_thumb):
     """
     Renders 1080p Full-Bleed Cinematic Aesthetic Thumbnail:
-    - Pristine full-bleed 16:9 cinematic background with rich contrast
-    - Cinematic dark vignette & gradient for optimal text separation
+    - Pristine full-bleed 16:9 cinematic background with rich contrast (zero black bars)
+    - AI Face-Aware layout: If an artist face is detected in the upper/middle frame,
+      typography is intelligently placed in the Lower Third so it NEVER obscures the face.
     - Large stylized white chalk/brush title (CaveatBrush) with multi-pass soft drop shadow
     - Clean uppercase subtitle [ SLOWED + REVERB ]
     - Subtle aesthetic @nikhildswll watermark in top-right
@@ -631,22 +646,17 @@ def generate_thumbnail(cover_path, title, artist, output_thumb):
     font_brush_path = os.path.join(font_dir, 'CaveatBrush-Regular.ttf')
     font_sans_path = os.path.join(font_dir, 'BebasNeue.ttf')
 
-    font_title = ImageFont.truetype(font_brush_path, 170) if os.path.exists(font_brush_path) else get_font(130, bold=True)
-    font_sub = ImageFont.truetype(font_sans_path, 54) if os.path.exists(font_sans_path) else get_font(48, bold=True)
-    font_watermark = ImageFont.truetype(font_sans_path, 38) if os.path.exists(font_sans_path) else get_font(32, bold=False)
+    font_title = ImageFont.truetype(font_brush_path, 140) if os.path.exists(font_brush_path) else get_font(120, bold=True)
+    font_sub = ImageFont.truetype(font_sans_path, 44) if os.path.exists(font_sans_path) else get_font(40, bold=True)
+    font_watermark = ImageFont.truetype(font_sans_path, 34) if os.path.exists(font_sans_path) else get_font(30, bold=False)
 
     if cover_path and os.path.exists(cover_path):
         try:
             raw_im = Image.open(cover_path).convert('RGB')
             im = crop_letterbox_bars(raw_im)
-            im_ratio = im.width / im.height
-            target_ratio = W / H
-            if im_ratio > target_ratio:
-                new_h = H
-                new_w = int(H * im_ratio)
-            else:
-                new_w = W
-                new_h = int(W / im_ratio)
+            scale = max(W / im.width, H / im.height)
+            new_w = int(im.width * scale)
+            new_h = int(im.height * scale)
             im_resized = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
             left = (new_w - W) // 2
             top = (new_h - H) // 2
@@ -657,16 +667,24 @@ def generate_thumbnail(cover_path, title, artist, output_thumb):
         bg = Image.new('RGB', (W, H), '#18181b')
 
     # Color Grade & Contrast Enhancement
-    bg = ImageEnhance.Contrast(bg).enhance(1.18)
-    bg = ImageEnhance.Color(bg).enhance(1.08)
+    bg = ImageEnhance.Contrast(bg).enhance(1.10)
+    bg = ImageEnhance.Color(bg).enhance(1.10)
 
-    # Cinema Vignette & dark gradient overlay for text readability
-    vignette = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    v_draw = ImageDraw.Draw(vignette)
-    for y in range(H):
-        alpha = int(55 + 95 * (y / H))
-        v_draw.line([(0, y), (W, y)], fill=(6, 6, 10, alpha))
-    bg.paste(vignette, (0, 0), vignette)
+    # Face detection to protect actor/singer face from text occlusion
+    has_face = False
+    face_y = H // 2
+    try:
+        import cv2
+        import numpy as np
+        cv_img = cv2.cvtColor(np.array(bg), cv2.COLOR_RGB2BGR)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        faces = face_cascade.detectMultiScale(cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY), 1.1, 4, minSize=(80, 80))
+        if len(faces) > 0:
+            has_face = True
+            largest = max(faces, key=lambda f: f[2]*f[3])
+            face_y = largest[1] + largest[3] // 2
+    except Exception:
+        pass
 
     clean_title = title.upper()
     sub_text = '[ SLOWED + REVERB ]'
@@ -675,11 +693,10 @@ def generate_thumbnail(cover_path, title, artist, output_thumb):
     tw = bbox_t[2] - bbox_t[0]
     th = bbox_t[3] - bbox_t[1]
 
-    # If title is very wide, scale down font
-    if tw > W - 200:
-        scale_factor = (W - 250) / tw
-        new_size = int(170 * scale_factor)
-        font_title = ImageFont.truetype(font_brush_path, max(new_size, 85)) if os.path.exists(font_brush_path) else get_font(max(new_size, 85), bold=True)
+    # If title is wide, scale down font nicely
+    if tw > W - 250:
+        scale_f = (W - 300) / tw
+        font_title = ImageFont.truetype(font_brush_path, max(int(140 * scale_f), 70)) if os.path.exists(font_brush_path) else get_font(max(int(120 * scale_f), 60), bold=True)
         bbox_t = font_title.getbbox(clean_title)
         tw = bbox_t[2] - bbox_t[0]
         th = bbox_t[3] - bbox_t[1]
@@ -688,23 +705,47 @@ def generate_thumbnail(cover_path, title, artist, output_thumb):
     sw = bbox_s[2] - bbox_s[0]
     sh = bbox_s[3] - bbox_s[1]
 
-    tx = (W - tw) // 2
-    ty = (H - th - sh - 30) // 2 + 30
-
-    sx = (W - sw) // 2
-    sy = ty + th + 25
+    if has_face and face_y < int(H * 0.65):
+        # Face is in upper/middle frame -> Place in lower third (Never covers face!)
+        tx = (W - tw) // 2
+        ty = int(H * 0.74)
+        sx = (W - sw) // 2
+        sy = ty + th + 18
+        grad = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        g_draw = ImageDraw.Draw(grad)
+        start_y = int(H * 0.58)
+        for y in range(start_y, H):
+            prog = max(0.0, float(y - start_y) / float(H - start_y))
+            alpha = int(220 * (prog ** 1.3))
+            g_draw.line([(0, y), (W, y)], fill=(4, 4, 8, alpha))
+        bg_rgba = bg.convert('RGBA')
+        bg = Image.alpha_composite(bg_rgba, grad).convert('RGB')
+    else:
+        # Standard balanced layout
+        tx = (W - tw) // 2
+        ty = int(H * 0.44)
+        sx = (W - sw) // 2
+        sy = ty + th + 18
+        vignette = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        v_draw = ImageDraw.Draw(vignette)
+        for y in range(H):
+            alpha = int(50 + 90 * (y / H))
+            v_draw.line([(0, y), (W, y)], fill=(6, 6, 10, alpha))
+        bg_rgba = bg.convert('RGBA')
+        bg = Image.alpha_composite(bg_rgba, vignette).convert('RGB')
 
     # Multi-pass soft shadow for depth
     shadow_img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     s_draw = ImageDraw.Draw(shadow_img)
-    for dx, dy in [(-3,-3), (3,-3), (-3,3), (3,3), (0, 5), (0, 8), (0, 11)]:
-        s_draw.text((tx + dx, ty + dy), clean_title, fill=(0, 0, 0, 240), font=font_title)
-        s_draw.text((sx + dx, sy + dy), sub_text, fill=(0, 0, 0, 240), font=font_sub)
+    for dx, dy in [(-3,-3), (3,-3), (-3,3), (3,3), (0, 5), (0, 9), (0, 14)]:
+        s_draw.text((tx + dx, ty + dy), clean_title, fill=(0, 0, 0, 245), font=font_title)
+        s_draw.text((sx + dx, sy + dy), sub_text, fill=(0, 0, 0, 245), font=font_sub)
 
     shadow_blur = shadow_img.filter(ImageFilter.GaussianBlur(radius=8))
-    bg.paste(shadow_blur, (0, 0), shadow_blur)
+    bg_rgba = bg.convert('RGBA')
+    bg_rgba = Image.alpha_composite(bg_rgba, shadow_blur)
 
-    draw = ImageDraw.Draw(bg)
+    draw = ImageDraw.Draw(bg_rgba)
     draw.text((tx, ty), clean_title, fill='#ffffff', font=font_title)
     draw.text((sx, sy), sub_text, fill='#ffffff', font=font_sub)
 
@@ -712,9 +753,10 @@ def generate_thumbnail(cover_path, title, artist, output_thumb):
     wm_text = f"@{CHANNEL_NAME.upper()}"
     wm_bbox = font_watermark.getbbox(wm_text)
     wm_w = wm_bbox[2] - wm_bbox[0]
-    draw.text((W - wm_w - 70, 60), wm_text, fill=(255, 255, 255, 185), font=font_watermark)
+    draw.text((W - wm_w - 60, 50), wm_text, fill=(255, 255, 255, 190), font=font_watermark)
 
-    bg.save(output_thumb, quality=95)
+    bg_final = bg_rgba.convert('RGB')
+    bg_final.save(output_thumb, quality=95)
     return output_thumb
 
 def generate_video(audio_path, thumbnail_path, output_video):
