@@ -511,19 +511,20 @@ def download_audio_and_cover(video_id, out_prefix):
     audio_path = f"{out_prefix}.mp3"
     thumb_template = f"{out_prefix}.%(ext)s"
 
-    strategies = [
-        ['yt-dlp', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs'],
+    strategies = []
+    if os.path.exists('cookies.txt'):
+        strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=visionos,android;player_skip=webpage,configs'])
+        strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=web,mweb'])
+        strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--remote-components', 'ejs:github'])
+    strategies.extend([
         ['yt-dlp', '--extractor-args', 'youtube:player_client=visionos;player_skip=webpage,configs'],
+        ['yt-dlp', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs'],
         ['yt-dlp', '--remote-components', 'ejs:github', '--extractor-args', 'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=tv_embedded,web_embedded'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=ios,tv'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=web_creator'],
         ['yt-dlp', '--extractor-args', 'youtube:player_client=mweb,android']
-    ]
-    if os.path.exists('cookies.txt'):
-        strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=android;player_skip=webpage,configs'])
-        strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--remote-components', 'ejs:github'])
-        strategies.append(['yt-dlp', '--cookies', 'cookies.txt', '--extractor-args', 'youtube:player_client=web,mweb'])
+    ])
 
     download_success = False
     last_err = None
