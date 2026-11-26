@@ -71,7 +71,7 @@ def search_trending_songs(max_count=4):
     done_ids = set(item.get('id') for item in history if isinstance(item, dict))
     done_titles = set(re.sub(r'[^a-z0-9]', '', (item.get('title') or '').lower()) for item in history if isinstance(item, dict) and item.get('title'))
 
-    # All defined categories in standard rotation order with Viral Search-Magnets
+    # All defined categories in standard rotation order with verified iconic hits & superhit tracks
     all_categories = [
         {
             'name': 'Aesthetic Indie & Viral Lo-Fi',
@@ -135,15 +135,18 @@ def search_trending_songs(max_count=4):
         {
             'name': 'Haryanvi & NCR Hip Hop',
             'queries': [
-                'trending haryanvi songs official music video',
-                'latest haryanvi hits official video',
-                'dhanda nyoliwala official video',
-                'masoom sharma official video',
-                'gulzaar chhaniwala official video',
-                'khasa aala chahar official video',
-                'renuka panwar official video',
-                'bintu pabra official video',
-                'ajay hooda official video'
+                'dhanda nyoliwala russian bandana official video',
+                'dhanda nyoliwala up to u official video',
+                'dhanda nyoliwala no favours official video',
+                'masoom sharma 2 nambari official video',
+                'renuka panwar 52 gaj ka daman official video',
+                'gulzaar chhaniwala jug jug jeeve official video',
+                'khasa aala chahar lootera official video',
+                'bintu pabra kya baat hai official video',
+                'masoom sharma peshi official video',
+                'renuka panwar chatak matak official video',
+                'gulzaar chhaniwala dada sadhu official video',
+                'ajay hooda bahu kale ki official video'
             ]
         },
         {
@@ -204,8 +207,10 @@ def search_trending_songs(max_count=4):
         'ai song', 'ai cover', 'ai version', 'ai generated', 'artificial intelligence',
         'fan made', 'fanmade', 'concept', 'unreleased', 'teaser', 'trailer',
         'status', 'shorts', 'whatsapp', 'ringtone', 'cover song', 'tribute',
+        'cover', 'indian idol', 'audition', 'live performance', 'stage performance',
+        'unplugged', 'acoustic', 'karaoke', 'instrumental',
         'vatsal bhoya', 'prakash jojawar', 'reaction', 'review', 'vlog',
-        'suno', 'udio', 'karaoke', 'instrumental',
+        'suno', 'udio',
         'tamil', 'telugu', 'malayalam', 'kannada', 'bengali', 'marathi', 'odia', 'gujarati'
     ]
     BANNED_CHANNELS = ['vatsal bhoya', 'prakash jojawar']
@@ -270,10 +275,30 @@ def search_trending_songs(max_count=4):
                     if vid_id in done_ids:
                         continue
 
-                    # Strict title duplicate prevention: clean and check against already processed songs
-                    cand_title, _, _, _ = clean_song_info(raw_title, uploader)
+                    # Direct check: if raw title contains any canonical hit song already in history, skip immediately
+                    raw_norm = re.sub(r'[^a-z0-9]', '', raw_title.lower())
+                    if any(len(dt) >= 4 and dt in raw_norm for dt in done_titles):
+                        print(f"Skipping song already in history: '{raw_title[:50]}'")
+                        continue
+
+                    # Strict title parsing and spam rejection
+                    cand_title, cand_artist, cand_credits, cand_uploader = clean_song_info(raw_title, uploader)
+                    if not cand_title or not cand_artist:
+                        continue
+
                     cand_norm = re.sub(r'[^a-z0-9]', '', cand_title.lower())
                     if not cand_norm or cand_norm in done_titles:
+                        continue
+
+                    # Fuzzy duplicate check across existing history
+                    is_duplicate = False
+                    for dt in done_titles:
+                        if len(cand_norm) >= 4 and len(dt) >= 4:
+                            if cand_norm in dt or dt in cand_norm:
+                                is_duplicate = True
+                                break
+                    if is_duplicate:
+                        print(f"Skipping fuzzy duplicate: '{cand_title}' (matches history)")
                         continue
 
                     # Single original tracks must be 110s - 360s
@@ -293,8 +318,8 @@ def search_trending_songs(max_count=4):
                     if re.search(r'[\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F\u0980-\u09FF]', raw_title):
                         continue
 
-                    # Block low-view spam / fake AI tracks (real trending hits have >= 50k views)
-                    if view_count > 0 and view_count < 50000:
+                    # Block low-view spam / fake AI tracks (real superhit hits have >= 150k views)
+                    if view_count > 0 and view_count < 150000:
                         continue
 
                     selected_songs.append({
@@ -319,93 +344,102 @@ def search_trending_songs(max_count=4):
     print(f"Found {len(selected_songs)} fresh songs across Haryanvi, Punjabi & Hindi.")
     return selected_songs
 
+KNOWN_SINGERS = [
+    'Arijit Singh', 'Atif Aslam', 'Karan Aujla', 'Talwiinder', 'AP Dhillon',
+    'Diljit Dosanjh', 'B Praak', 'Shreya Ghoshal', 'Jubin Nautiyal', 'Jasleen Royal',
+    'Anuv Jain', 'Prateek Kuhad', 'Darshan Raval', 'Sidhu Moose Wala', 'Kaka',
+    'Amrit Maan', 'Jordan Sandhu', 'Mankirt Aulakh', 'King', 'MC Stan', 'Badshah',
+    'Mohit Chauhan', 'KK', 'Sonu Nigam', 'Sunidhi Chauhan', 'Armaan Malik', 'Neha Kakkar',
+    'Mika Singh', 'Yo Yo Honey Singh', 'Honey Singh', 'Guru Randhawa', 'Hardy Sandhu', 'Jass Manak',
+    'D Naveen', 'Masoom Sharma', 'Amit Saini Rohtakiya', 'Renuka Panwar', 'Guri',
+    'Dhanda Nyoliwala', 'Gulzaar Chhaniwala', 'Khasa Aala Chahar', 'Bintu Pabra', 'Pranjal Dahiya', 'Manisha Sharma', 'Ajay Hooda'
+]
+
+SPAM_PATTERNS = [
+    r'\b(new|latest|top|hit|hits|best|dj)\s+(haryanvi|punjabi|hindi|bollywood|bhojpuri)?\s*(songs?|song|track|music|video)?\s*\d{4}\b',
+    r'^\s*(new|latest|top|trending)\s+(songs?|video|track)',
+    r'\b(all\s+songs|jukebox|mashup|non\s*stop|full\s*album|compilation)\b',
+    r'\b(shorts|reels|status|ringtone|preview|teaser|trailer)\b'
+]
+
+def is_spam_title(raw_title):
+    t_low = raw_title.lower()
+    for pat in SPAM_PATTERNS:
+        if re.search(pat, t_low):
+            return True
+    return False
+
 def clean_song_info(raw_title, uploader):
     import re
-    clean_uploader = uploader.replace(' - Topic', '').replace('VEVO', '').strip()
+    clean_u = uploader.replace(' - Topic', '').replace('VEVO', '').strip()
 
-    candidate_title = ''
-    detected_artist = ''
+    # If the raw title is spam, return early
+    if is_spam_title(raw_title):
+        return None, None, None, None
 
-    # Check if artist is formatted after brackets e.g. "Song (Video) - Artist | Label"
-    post_artist_match = re.search(r'[\)\]]\s*-\s*([^|]+)', raw_title)
-    if post_artist_match:
-        candidate_title = re.split(r'[\(\[]', raw_title)[0].strip()
-        detected_artist = post_artist_match.group(1).strip()
-    else:
-        part0 = re.split(r'[\(\[]', raw_title)[0].strip()
-        if ' - ' in part0:
-            left, right = [p.strip() for p in part0.split(' - ', 1)]
-            if clean_uploader and (clean_uploader.lower() in left.lower() or left.lower() in clean_uploader.lower()):
-                candidate_title = right
-                detected_artist = left
-            elif clean_uploader and (clean_uploader.lower() in right.lower() or right.lower() in clean_uploader.lower()):
-                candidate_title = left
-                detected_artist = right
-            else:
-                candidate_title = right
-                detected_artist = left
-        elif ' | ' in part0:
-            p_list = [p.strip() for p in part0.split(' | ') if p.strip()]
-            candidate_title = p_list[0]
-            if len(p_list) > 1:
-                detected_artist = p_list[1]
+    # Strip bracketed metadata like (Official Video), [4K Ultra HD], etc.
+    cleaned = re.sub(r'[\(\[][^)\]]*(official|music video|video|audio|lyrics|lyrical|4k|8k|hd|full song|visualizer|remix|version)[^)\]]*[\)\]]', '', raw_title, flags=re.I).strip()
+    
+    # Strip common trailing junk words
+    cleaned = re.sub(r'\b(Official Video|Official Audio|Music Video|Full Video Song|Full Video|Full Song|Video Song|Audio Song|Lyrical Video|Lyrical Song|Official)\b', '', cleaned, flags=re.I).strip()
+
+    # Split on main delimiter: " - " or " : "
+    song_title = ""
+    artist_display = ""
+
+    if ' - ' in cleaned:
+        left, right = [p.strip() for p in cleaned.split(' - ', 1)]
+        left_has_singer = any(re.search(r'\b' + re.escape(s) + r'\b', left, re.I) for s in KNOWN_SINGERS)
+        right_has_singer = any(re.search(r'\b' + re.escape(s) + r'\b', right, re.I) for s in KNOWN_SINGERS)
+        
+        if left_has_singer:
+            artist_display = left.split('|')[0].strip()
+            song_title = right.split('|')[0].strip()
+        elif right_has_singer:
+            song_title = left.split('|')[0].strip()
+            artist_display = right.split('|')[0].strip()
+        elif clean_u and (clean_u.lower() in left.lower() or left.lower() in clean_u.lower()):
+            artist_display = left.split('|')[0].strip()
+            song_title = right.split('|')[0].strip()
+        elif clean_u and (clean_u.lower() in right.lower() or right.lower() in clean_u.lower()):
+            song_title = left.split('|')[0].strip()
+            artist_display = right.split('|')[0].strip()
         else:
-            candidate_title = part0
-
-    # Clean out stray junk words from title
-    candidate_title = re.sub(r'\b(with|feat\.?|ft\.?)\s+.*', '', candidate_title, flags=re.IGNORECASE).strip()
-    candidate_title = re.sub(r'\b(Official|Music|Full|Lyrical|Lyric|Audio|Video|Song|HD|8K|4K|2K|1080p|Visualiser|Visualizer)\b', '', candidate_title, flags=re.IGNORECASE).strip()
-
-    # Collect credited artists from raw title, filtering out generic channel tags
-    parts = [p.strip() for p in raw_title.split(' | ') if p.strip()]
-    credited_names = []
-    for p in parts[1:]:
-        p_clean = re.sub(r'\b(Full|Video|Song|Audio|Official|HD|8K|4K|2K|Movie)\b', '', p, flags=re.IGNORECASE).strip()
-        if re.search(r'\b(New|Latest|Top|Best|Trending|Hit|Hits)\s+(Haryanvi|Punjabi|Hindi|Bhojpuri|Bollywood)?\s*(Songs|Song|Track|Music)?\s*\d{4}?\b', p_clean, re.IGNORECASE):
-            continue
-        if p_clean and len(p_clean) < 40 and p_clean.lower() not in clean_uploader.lower():
-            credited_names.append(p_clean)
-
-    # Smart Singer & Artist Prioritization (Never dump 5 cast names like Ranbir, Shraddha, Pritam)
-    KNOWN_SINGERS = [
-        'Arijit Singh', 'Atif Aslam', 'Karan Aujla', 'Talwiinder', 'AP Dhillon',
-        'Diljit Dosanjh', 'B Praak', 'Shreya Ghoshal', 'Jubin Nautiyal', 'Jasleen Royal',
-        'Anuv Jain', 'Prateek Kuhad', 'Darshan Raval', 'Sidhu Moose Wala', 'Kaka',
-        'Amrit Maan', 'Jordan Sandhu', 'Mankirt Aulakh', 'King', 'MC Stan', 'Badshah',
-        'Mohit Chauhan', 'KK', 'Sonu Nigam', 'Sunidhi Chauhan', 'Armaan Malik', 'Neha Kakkar',
-        'Mika Singh', 'Yo Yo Honey Singh', 'Guru Randhawa', 'Hardy Sandhu', 'Jass Manak',
-        'D Naveen', 'Masoom Sharma', 'Amit Saini Rohtakiya', 'Renuka Panwar', 'Guri'
-    ]
-    matched_singers = [s for s in KNOWN_SINGERS if re.search(r'\b' + re.escape(s) + r'\b', raw_title, re.IGNORECASE)]
-
-    if matched_singers:
-        artist_display = matched_singers[0]
-        all_credits = ", ".join(matched_singers)
-    elif detected_artist and detected_artist.lower() not in clean_uploader.lower() and not re.search(r'\b(New|Latest|Top|Best|Trending)\b', detected_artist, re.IGNORECASE):
-        artist_display = detected_artist
-        all_credits = detected_artist
-    elif credited_names:
-        raw_list = []
-        for block in credited_names:
-            for item in block.split(','):
-                it = item.strip()
-                if it and len(it) > 2 and it not in raw_list:
-                    raw_list.append(it)
-        artist_display = ", ".join(raw_list[:2]) if raw_list else credited_names[0]
-        all_credits = ", ".join(credited_names)
+            song_title = left.split('|')[0].strip()
+            artist_display = right.split('|')[0].strip()
+    elif ' : ' in cleaned:
+        left, right = [p.strip() for p in cleaned.split(' : ', 1)]
+        song_title = left.split('|')[0].strip()
+        artist_display = right.split('|')[0].strip()
+    elif ' | ' in cleaned:
+        parts = [p.strip() for p in cleaned.split(' | ') if p.strip()]
+        song_title = parts[0]
+        artist_display = parts[1] if len(parts) > 1 else clean_u
     else:
-        artist_display = detected_artist or clean_uploader
+        song_title = cleaned
+        artist_display = clean_u
 
-    # Clean singer name out of song title if it got appended
-    candidate_title = re.sub(r'\b' + re.escape(artist_display) + r'\b', '', candidate_title, flags=re.IGNORECASE).strip()
-    candidate_title = re.sub(r'^[\s\-_|:,]+|[\s\-_|:,]+$', '', candidate_title).strip()
-    candidate_title = re.sub(r'[\(\[\{\)\]\}]', '', candidate_title).strip()
+    # Find best artist match from KNOWN_SINGERS in raw_title
+    matched = [s for s in KNOWN_SINGERS if re.search(r'\b' + re.escape(s) + r'\b', raw_title, re.I)]
+    if matched:
+        artist_display = matched[0]
+    elif not artist_display or artist_display.lower() in ['t-series', 'speed records', 'white hill music', 'sony music india', 'saregama']:
+        artist_display = clean_u
 
-    title = candidate_title or "Hit Track"
-    return title, artist_display, all_credits, clean_uploader
+    # Clean out stray junk words from song_title
+    song_title = re.sub(r'\b(Full|Video|Song|Audio|Official|HD|8K|4K|2K|Movie)\b', '', song_title, flags=re.I).strip()
+    song_title = re.sub(r'\b(with|feat\.?|ft\.?)\s+.*', '', song_title, flags=re.I).strip()
+    if artist_display:
+        song_title = re.sub(r'\b' + re.escape(artist_display) + r'\b', '', song_title, flags=re.I).strip()
+    song_title = re.sub(r'^[\s\-_|:,]+|[\s\-_|:,]+$', '', song_title).strip()
+    song_title = re.sub(r'[\(\[\{\)\]\}]', '', song_title).strip()
 
-    title = re.sub(r'[\(\[\{\)\]\}]', '', title).strip()
-    return title or "Hit Track", artist_display, all_credits, clean_uploader
+    # Discard if title is spam, generic, or too short
+    if not song_title or len(song_title) < 2 or is_spam_title(song_title) or re.search(r'^\d+$', song_title):
+        return None, None, None, None
+
+    all_credits = artist_display
+    return song_title, artist_display, all_credits, clean_u
 
 def extract_smart_hero_frame(v_url, clean_frame_path):
     """
