@@ -66,37 +66,42 @@ def get_ytdlp_base_cmd(for_search=False):
     base.extend(['--extractor-args', arg])
     return base
 
+def get_title_tokens(s):
+    s = s.lower()
+    s = re.sub(r'\b(subha|subaha)\b', 'subah', s)
+    s = re.sub(r'[^a-z0-9 ]', ' ', s)
+    tokens = set(s.split())
+    stopwords = {'official', 'video', 'song', 'audio', 'full', 'music', 'hd', '8k', '4k', 'lyrics', 'lyrical', 'desi', 'boyz', 'the', 'a', 'in', 'of', 'and', 'new', 'latest', 'remix', 'track', '2026', '2025', '2024'}
+    return tokens - stopwords
+
 def search_trending_songs(max_count=4):
     history = load_history()
-    done_ids = set(item.get('id') for item in history if isinstance(item, dict))
+    done_ids = set(item.get('id') for item in history if isinstance(item, dict) and item.get('id'))
     done_titles = set(re.sub(r'[^a-z0-9]', '', (item.get('title') or '').lower()) for item in history if isinstance(item, dict) and item.get('title'))
+    done_token_sets = [get_title_tokens(item.get('title') or '') for item in history if isinstance(item, dict) and item.get('title')]
+    recent_artists = [re.sub(r'[^a-z0-9]', '', (item.get('artist') or '').lower()) for item in history[-4:] if isinstance(item, dict) and item.get('artist')]
 
     # All defined categories in standard rotation order with verified iconic hits & superhit tracks
     all_categories = [
         {
             'name': 'Aesthetic Indie & Viral Lo-Fi',
             'queries': [
-                'anuv jain husn official video',
                 'talwiinder dhundhala official video',
                 'aur tu hai kahan official video',
-                'anuv jain baarishein official video',
                 'abdul hannan bikhra official video',
                 'talwiinder gallan 4 official video',
                 'abdul hannan iraaday official video',
                 'kaifi khalil kahani suno 2.0 official video',
-                'anuv jain alag aasmaan official video',
                 'talwiinder nasha official video',
                 'hassan roshaan sukoon official video',
                 'prateek kuhad kasoor official video',
                 'mitraz akhiyaan official video',
-                'anuv jain jo tum mere ho official video',
                 'choo lo the local train official video'
             ]
         },
         {
             'name': 'Punjabi & Desi Hip Hop',
             'queries': [
-                'karan aujla winning speech official video',
                 'shubh cheques official music video',
                 'ap dhillon with you official music video',
                 'karan aujla softly official music video',
@@ -107,16 +112,14 @@ def search_trending_songs(max_count=4):
                 'shubh her official music video',
                 'diljit dosanjh born to shine official video',
                 'ap dhillon summer high official video',
-                'karan aujla admirin you official video',
                 'shubh king shit official music video',
                 'sidhu moose wala 295 official video',
-                'seedhe maut namastute official video'
+                'sidhu moose wala so high official video'
             ]
         },
         {
             'name': 'Hindi (2000s-2020s Hits, No 90s)',
             'queries': [
-                'arijit singh o bedardeya official video',
                 'kesariya arijit singh official video',
                 'apna bana le arijit singh official video',
                 'tum ho mohit chauhan rockstar official video',
@@ -129,30 +132,28 @@ def search_trending_songs(max_count=4):
                 'tu hi meri shab hai gangster emraan hashmi',
                 'channa mereya arijit singh official video',
                 'agar tum saath ho arijit singh alka yagnik',
-                'phir le aya dil barfi arijit singh'
+                'phir le aya dil barfi arijit singh',
+                'atif aslam pehli nazar mein official video'
             ]
         },
         {
             'name': 'Haryanvi & NCR Hip Hop',
             'queries': [
-                'dhanda nyoliwala russian bandana official video',
-                'dhanda nyoliwala up to u official video',
-                'dhanda nyoliwala no favours official video',
                 'masoom sharma 2 nambari official video',
                 'renuka panwar 52 gaj ka daman official video',
                 'gulzaar chhaniwala jug jug jeeve official video',
                 'khasa aala chahar lootera official video',
-                'bintu pabra kya baat hai official video',
+                'bintu pabra burst mode official video',
                 'masoom sharma peshi official video',
                 'renuka panwar chatak matak official video',
                 'gulzaar chhaniwala dada sadhu official video',
-                'ajay hooda bahu kale ki official video'
+                'ajay hooda bahu kale ki official video',
+                'masoom sharma bandook official video'
             ]
         },
         {
             'name': 'Iconic Bangers & Nostalgia (Famous Party & Cult Hits)',
             'queries': [
-                'subah hone na de official video desi boyz',
                 'proper patola official video diljit dosanjh',
                 'baby doll official video ragini mms 2',
                 'high heels te nachche official video',
@@ -162,6 +163,7 @@ def search_trending_songs(max_count=4):
                 'hookah bar official video khiladi 786',
                 'char botal vodka official video honey singh',
                 'blue eyes official video honey singh',
+                'brown rang official video honey singh',
                 'dheere dheere se meri zindagi honey singh official video'
             ]
         }
@@ -173,20 +175,6 @@ def search_trending_songs(max_count=4):
         if isinstance(item, dict) and item.get('category'):
             last_cat = item.get('category')
             break
-        elif isinstance(item, dict):
-            t = (item.get('title', '') + ' ' + item.get('artist', '')).lower()
-            if any(k in t for k in ['renuka', 'masoom', 'dhanda', 'aarju', 'geeta', 'pranjal', 'haryanvi', 'kabootar', 'kood']):
-                last_cat = 'Haryanvi & NCR Hip Hop'
-                break
-            elif any(k in t for k in ['daddy mummy', 'subah hone na de', 'proper patola', 'baby doll']):
-                last_cat = 'Iconic Bangers & Nostalgia (Famous Party & Cult Hits)'
-                break
-            elif any(k in t for k in ['mashooqa', 'atif', 'arijit', 'emraan', 'pritam']):
-                last_cat = 'Hindi (2000s-2020s Hits, No 90s)'
-                break
-            elif any(k in t for k in ['diljit', 'karan aujla', 'moose', 'ap dhillon', 'punjabi', 'deep money', 'shubh']):
-                last_cat = 'Punjabi & Desi Hip Hop'
-                break
 
     cat_names = [c['name'] for c in all_categories]
     if last_cat in cat_names:
@@ -195,6 +183,10 @@ def search_trending_songs(max_count=4):
         next_idx = 0
 
     categories = all_categories[next_idx:] + all_categories[:next_idx]
+    # Shuffle queries within each category for dynamic freshness
+    for cat in categories:
+        random.shuffle(cat['queries'])
+
     print(f"Genre Rotation: Last upload was '{last_cat}' -> Prioritizing '{categories[0]['name']}' for this run!")
 
     BANNED_KEYWORDS = [
@@ -286,8 +278,29 @@ def search_trending_songs(max_count=4):
                     if not cand_title or not cand_artist:
                         continue
 
+                    # Artist cooldown: Never upload the same artist repeatedly (ensures diverse catalog)
+                    cand_art_norm = re.sub(r'[^a-z0-9]', '', cand_artist.lower())
+                    if any(cand_art_norm and (cand_art_norm in ra or ra in cand_art_norm) for ra in recent_artists if len(ra) >= 4):
+                        print(f"Skipping artist cooldown (recently uploaded): '{cand_artist}'")
+                        continue
+
                     cand_norm = re.sub(r'[^a-z0-9]', '', cand_title.lower())
                     if not cand_norm or cand_norm in done_titles:
+                        continue
+
+                    # Multi-word token deduplication: catches spelling variants (subha/subah) and subtitle re-uploads
+                    cand_toks = get_title_tokens(raw_title) | get_title_tokens(cand_title)
+                    is_token_dup = False
+                    for st in done_token_sets:
+                        overlap = cand_toks & st
+                        if len(overlap) >= 2 and len(overlap) / max(min(len(cand_toks), len(st)), 1) >= 0.5:
+                            is_token_dup = True
+                            break
+                        elif len(cand_toks) == 1 and len(st) == 1 and cand_toks == st:
+                            is_token_dup = True
+                            break
+                    if is_token_dup:
+                        print(f"Skipping duplicate song (token match): '{cand_title}'")
                         continue
 
                     # Fuzzy duplicate check across existing history
@@ -441,105 +454,6 @@ def clean_song_info(raw_title, uploader):
     all_credits = artist_display
     return song_title, artist_display, all_credits, clean_u
 
-def extract_smart_hero_frame(v_url, clean_frame_path):
-    """
-    Intelligently samples multiple timestamps across the music video stream.
-    Uses AI / Computer Vision (Face detection, contrast, sharpness, dynamic range)
-    to automatically select the best cinematic hero frame (e.g. artist looking at camera,
-    well-lit stage, iconic scene), strictly avoiding pitch-black frames, backs of heads,
-    random objects, or blurry transition cuts.
-    """
-    # Start timestamps after 00:00:50 to completely avoid opening title cards, credits, and logos
-    timestamps = ['00:00:55', '00:01:15', '00:01:35', '00:01:55', '00:02:15', '00:02:35', '00:02:55', '00:03:15']
-    candidates = []
-
-    has_cv2 = False
-    try:
-        import cv2
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        has_cv2 = True
-    except Exception:
-        has_cv2 = False
-
-    for i, ts in enumerate(timestamps):
-        tmp_frame = f"{clean_frame_path}_cand_{i}.jpg"
-        cmd = ['ffmpeg', '-y', '-ss', ts, '-i', v_url, '-vframes', '1', '-q:v', '2', tmp_frame]
-        try:
-            subprocess.run(cmd, capture_output=True, timeout=25)
-        except Exception:
-            continue
-
-        if not os.path.exists(tmp_frame) or os.path.getsize(tmp_frame) < 8000:
-            if os.path.exists(tmp_frame):
-                try: os.remove(tmp_frame)
-                except Exception: pass
-            continue
-
-        try:
-            if has_cv2:
-                import numpy as np
-                img = cv2.imread(tmp_frame)
-                if img is None:
-                    continue
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                mean_val = float(np.mean(gray))
-                if mean_val < 32 or mean_val > 225:
-                    os.remove(tmp_frame)
-                    continue
-
-                contrast = float(np.std(gray))
-                sharpness = min(float(cv2.Laplacian(gray, cv2.CV_64F).var()), 500.0)
-                brightness_score = 100.0 - abs(mean_val - 110.0)
-
-                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(60, 60))
-                face_score = 0.0
-                if len(faces) > 0:
-                    for (x, y, w, h) in faces:
-                        if w >= 110 and h >= 110:
-                            face_score = max(face_score, 450.0)
-                        elif w >= 75 and h >= 75:
-                            face_score = max(face_score, 320.0)
-                        else:
-                            face_score = max(face_score, 120.0)
-
-                score = face_score + (contrast * 1.5) + (sharpness * 0.4) + brightness_score
-                candidates.append((score, tmp_frame))
-            else:
-                with Image.open(tmp_frame) as im:
-                    gray = im.convert('L')
-                    stat = ImageStat.Stat(gray)
-                    mean_val = stat.mean[0]
-                    if mean_val < 32 or mean_val > 225:
-                        os.remove(tmp_frame)
-                        continue
-                    std_dev = stat.stddev[0]
-                    brightness_score = 100.0 - abs(mean_val - 110.0)
-                    score = (std_dev * 2.0) + brightness_score
-                    candidates.append((score, tmp_frame))
-        except Exception as e:
-            if os.path.exists(tmp_frame):
-                try: os.remove(tmp_frame)
-                except Exception: pass
-
-    if not candidates:
-        return None
-
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    best_score, best_frame = candidates[0]
-    print(f"Smart Hero Frame selected with quality score: {best_score:.1f}")
-
-    if os.path.exists(clean_frame_path):
-        try: os.remove(clean_frame_path)
-        except Exception: pass
-    os.rename(best_frame, clean_frame_path)
-
-    for _, path in candidates[1:]:
-        if os.path.exists(path):
-            try: os.remove(path)
-            except Exception: pass
-
-    return clean_frame_path
-
 def download_audio_and_cover(video_id, out_prefix):
     url = f"https://www.youtube.com/watch?v={video_id}"
     audio_path = f"{out_prefix}.mp3"
@@ -588,21 +502,7 @@ def download_audio_and_cover(video_id, out_prefix):
     if not download_success:
         raise last_err or Exception("All download strategies failed.")
 
-    # Try extracting pristine clean 1080p frame directly from video stream (Zero poster text/logos)
-    clean_frame_path = f"{out_prefix}_clean_frame.jpg"
-    try:
-        url_cmd = ['yt-dlp', '-g', '-f', 'bestvideo[height<=1080]', url]
-        res = subprocess.run(url_cmd, capture_output=True, text=True, timeout=25)
-        v_url = res.stdout.strip().split('\n')[0]
-        if v_url and v_url.startswith('http'):
-            hero_frame = extract_smart_hero_frame(v_url, clean_frame_path)
-            if hero_frame and os.path.exists(hero_frame) and os.path.getsize(hero_frame) > 10000:
-                print("Extracted pristine AI-curated hero frame directly from video stream!")
-                return audio_path, hero_frame
-    except Exception as e:
-        print(f"Clean stream frame grab fallback: {e}")
-
-    # Fallback to downloaded thumbnail if stream frame grab failed
+    # Official album / cover artwork
     thumb_candidates = glob.glob(f"{out_prefix}*.jpg") + glob.glob(f"{out_prefix}*.webp") + glob.glob(f"{out_prefix}*.png")
     cover_path = thumb_candidates[0] if thumb_candidates else None
     return audio_path, cover_path
@@ -663,142 +563,90 @@ def layout_title(title_text, max_w):
     font = get_font(46, bold=True)
     return textwrap.wrap(title_text, width=16)[:2], font, 46
 
-def crop_letterbox_bars(im):
-    try:
-        gray = im.convert('L')
-        w, h = gray.size
-        # Sample two vertical columns (15% and 85%) to avoid center badges like iTunes/Dolby
-        top = 0
-        for y in range(int(h * 0.35)):
-            val1 = gray.getpixel((int(w * 0.15), y))
-            val2 = gray.getpixel((int(w * 0.85), y))
-            if val1 > 15 or val2 > 15:
-                top = y
-                break
-
-        if top > 15:
-            bottom = h - top
-            return im.crop((0, top, w, bottom))
-    except Exception as e:
-        print(f"Letterbox crop notice: {e}")
-    return im
-
 def generate_thumbnail(cover_path, title, artist, output_thumb):
     """
-    Renders 1080p Full-Bleed Cinematic Aesthetic Thumbnail:
-    - Pristine full-bleed 16:9 cinematic background with rich contrast (zero black bars)
-    - AI Face-Aware layout: If an artist face is detected in the upper/middle frame,
-      typography is intelligently placed in the Lower Third so it NEVER obscures the face.
-    - Large stylized white chalk/brush title (CaveatBrush) with multi-pass soft drop shadow
-    - Clean uppercase subtitle [ SLOWED + REVERB ]
-    - Subtle aesthetic @nikhildswll watermark in top-right
+    Renders 1080p Aesthetic Ivory Minimalist Card + Vinyl Layout:
+    - Warm Ivory (#f7f6f0) canvas with ambient cover blur and ivory wash
+    - Right Side: Square album cover card with vinyl record peeking out + realistic vinyl grooves
+    - Left Side: Elegant minimalist typography:
+      - Title in bold dark text (#0f172a)
+      - Subtitle: ( slowed + reverb ) in #334155
+      - Artist in #475569
+      - Watermark: @nikhildswll • 1080P FULL HD • 432HZ in #64748b
     """
     W, H = 1920, 1080
-    font_dir = os.path.join(BASE_DIR, 'fonts')
+    bg = Image.new('RGB', (W, H), '#f7f6f0')
 
-    font_brush_path = os.path.join(font_dir, 'CaveatBrush-Regular.ttf')
-    font_sans_path = os.path.join(font_dir, 'BebasNeue.ttf')
-
-    font_title = ImageFont.truetype(font_brush_path, 140) if os.path.exists(font_brush_path) else get_font(120, bold=True)
-    font_sub = ImageFont.truetype(font_sans_path, 44) if os.path.exists(font_sans_path) else get_font(40, bold=True)
-    font_watermark = ImageFont.truetype(font_sans_path, 34) if os.path.exists(font_sans_path) else get_font(30, bold=False)
-
+    # Ambient cover blur background
     if cover_path and os.path.exists(cover_path):
         try:
-            raw_im = Image.open(cover_path).convert('RGB')
-            im = crop_letterbox_bars(raw_im)
-            scale = max(W / im.width, H / im.height)
-            new_w = int(im.width * scale)
-            new_h = int(im.height * scale)
-            im_resized = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            left = (new_w - W) // 2
-            top = (new_h - H) // 2
-            bg = im_resized.crop((left, top, left + W, top + H))
+            cov = Image.open(cover_path).convert('RGB')
+            cov_blur = cov.resize((int(W * 1.3), int(H * 1.3))).filter(ImageFilter.GaussianBlur(radius=55))
+            bg.paste(cov_blur, (-100, -100))
+            # Overlay ivory cream wash
+            overlay = Image.new('RGBA', (W, H), (252, 251, 247, 230))
+            bg.paste(overlay, (0, 0), overlay)
+        except Exception as e:
+            print(f"Cover blur error: {e}")
+
+    draw = ImageDraw.Draw(bg)
+
+    # 1. Right Side: Card Artwork + Vinyl Peek
+    card_size = 580
+    card_x = W - card_size - 130
+    card_y = (H - card_size) // 2
+
+    # Vinyl circle behind card
+    vinyl_x = card_x + int(card_size * 0.72)
+    vinyl_y = card_y + card_size // 2
+    vr = int(card_size * 0.46)
+    draw.ellipse([vinyl_x - vr, vinyl_y - vr, vinyl_x + vr, vinyl_y + vr], fill='#121217')
+    # Vinyl grooves
+    for r in range(70, vr - 10, 12):
+        draw.ellipse([vinyl_x - r, vinyl_y - r, vinyl_x + r, vinyl_y + r], outline='#2a2a32', width=1)
+    draw.ellipse([vinyl_x - 45, vinyl_y - 45, vinyl_x + 45, vinyl_y + 45], fill='#f5f3ec')
+    draw.ellipse([vinyl_x - 10, vinyl_y - 10, vinyl_x + 10, vinyl_y + 10], fill='#111116')
+
+    # Front Album Card
+    if cover_path and os.path.exists(cover_path):
+        try:
+            cov = Image.open(cover_path).convert('RGB').resize((card_size, card_size), Image.Resampling.LANCZOS)
+            bg.paste(cov, (card_x, card_y))
         except Exception:
-            bg = Image.new('RGB', (W, H), '#18181b')
+            draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], fill='#e2e8f0')
     else:
-        bg = Image.new('RGB', (W, H), '#18181b')
+        draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], fill='#e2e8f0')
 
-    # Color Grade & Contrast Enhancement
-    bg = ImageEnhance.Contrast(bg).enhance(1.10)
-    bg = ImageEnhance.Color(bg).enhance(1.10)
+    # Card border
+    draw.rectangle([card_x, card_y, card_x + card_size, card_y + card_size], outline='#dcdad4', width=2)
 
-    # Face detection to protect actor/singer face from text occlusion
-    has_face = False
-    face_y = H // 2
-    try:
-        import cv2
-        import numpy as np
-        cv_img = cv2.cvtColor(np.array(bg), cv2.COLOR_RGB2BGR)
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        faces = face_cascade.detectMultiScale(cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY), 1.1, 4, minSize=(80, 80))
-        if len(faces) > 0:
-            has_face = True
-            largest = max(faces, key=lambda f: f[2]*f[3])
-            face_y = largest[1] + largest[3] // 2
-    except Exception:
-        pass
+    # 2. Left Side: Clean Minimalist Typography with Clearly Readable Larger Fonts
+    left_x = 130
+    max_w = card_x - left_x - 60
 
-    clean_title = title.upper()
-    sub_text = '[ SLOWED + REVERB ]'
+    lines, font_title, title_sz = layout_title(title.upper(), max_w)
+    line_spacing = int(title_sz * 1.15)
 
-    bbox_t = font_title.getbbox(clean_title)
-    tw = bbox_t[2] - bbox_t[0]
-    th = bbox_t[3] - bbox_t[1]
+    start_y = (H - card_size) // 2 + (85 if len(lines) == 1 else 45)
+    curr_y = start_y
+    for line in lines:
+        draw.text((left_x, curr_y), line, fill='#0f172a', font=font_title)
+        curr_y += line_spacing
 
-    # If title is wide, scale down font nicely
-    if tw > W - 250:
-        scale_f = (W - 300) / tw
-        font_title = ImageFont.truetype(font_brush_path, max(int(140 * scale_f), 70)) if os.path.exists(font_brush_path) else get_font(max(int(120 * scale_f), 60), bold=True)
-        bbox_t = font_title.getbbox(clean_title)
-        tw = bbox_t[2] - bbox_t[0]
-        th = bbox_t[3] - bbox_t[1]
+    font_slowed = get_font(42, bold=True)
+    draw.text((left_x, curr_y + 18), "( slowed + reverb )", fill='#334155', font=font_slowed)
 
-    bbox_s = font_sub.getbbox(sub_text)
-    sw = bbox_s[2] - bbox_s[0]
-    sh = bbox_s[3] - bbox_s[1]
+    font_artist = get_font(32, bold=False)
+    clean_artist = artist
+    while font_artist.getbbox(clean_artist)[2] - font_artist.getbbox(clean_artist)[0] > max_w and len(clean_artist) > 10:
+        clean_artist = clean_artist[:-4] + "..."
+    draw.text((left_x, curr_y + 78), clean_artist, fill='#475569', font=font_artist)
 
-    # Universal Aesthetic Layout: Lower-Third placement (y = int(H * 0.73))
-    # This guarantees typography never covers actor/singer faces or central subjects,
-    # with a soft cinematic bottom shadow gradient for high contrast readability.
-    tx = (W - tw) // 2
-    ty = int(H * 0.73)
-    sx = (W - sw) // 2
-    sy = ty + th + 18
+    # Watermark
+    font_sub = get_font(24, bold=False)
+    draw.text((left_x, H - 120), f"@{CHANNEL_NAME} • 1080P FULL HD • 432HZ", fill='#64748b', font=font_sub)
 
-    grad = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    g_draw = ImageDraw.Draw(grad)
-    start_y = int(H * 0.52)
-    for y in range(start_y, H):
-        prog = max(0.0, float(y - start_y) / float(H - start_y))
-        alpha = int(225 * (prog ** 1.25))
-        g_draw.line([(0, y), (W, y)], fill=(4, 4, 8, alpha))
-    bg_rgba = bg.convert('RGBA')
-    bg = Image.alpha_composite(bg_rgba, grad).convert('RGB')
-
-    # Multi-pass soft shadow for depth
-    shadow_img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    s_draw = ImageDraw.Draw(shadow_img)
-    for dx, dy in [(-3,-3), (3,-3), (-3,3), (3,3), (0, 5), (0, 9), (0, 14)]:
-        s_draw.text((tx + dx, ty + dy), clean_title, fill=(0, 0, 0, 245), font=font_title)
-        s_draw.text((sx + dx, sy + dy), sub_text, fill=(0, 0, 0, 245), font=font_sub)
-
-    shadow_blur = shadow_img.filter(ImageFilter.GaussianBlur(radius=8))
-    bg_rgba = bg.convert('RGBA')
-    bg_rgba = Image.alpha_composite(bg_rgba, shadow_blur)
-
-    draw = ImageDraw.Draw(bg_rgba)
-    draw.text((tx, ty), clean_title, fill='#ffffff', font=font_title)
-    draw.text((sx, sy), sub_text, fill='#ffffff', font=font_sub)
-
-    # Top Right Watermark
-    wm_text = f"@{CHANNEL_NAME.upper()}"
-    wm_bbox = font_watermark.getbbox(wm_text)
-    wm_w = wm_bbox[2] - wm_bbox[0]
-    draw.text((W - wm_w - 60, 50), wm_text, fill=(255, 255, 255, 190), font=font_watermark)
-
-    bg_final = bg_rgba.convert('RGB')
-    bg_final.save(output_thumb, quality=95)
+    bg.save(output_thumb, quality=95)
     return output_thumb
 
 def generate_video(audio_path, thumbnail_path, output_video):
